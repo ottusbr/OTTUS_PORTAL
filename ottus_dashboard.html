@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTTUS Portal — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --navy: #091c2b;
+    --navy-light: #0d2438;
+    --navy-card: #0f2a3d;
+    --orange: #d85a30;
+    --orange-hover: #c04e28;
+    --orange-dim: rgba(216,90,48,0.12);
+    --orange-border: rgba(216,90,48,0.25);
+    --text: #ffffff;
+    --text-secondary: rgba(255,255,255,0.5);
+    --text-tertiary: rgba(255,255,255,0.3);
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.12);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --sidebar-w: 220px;
+    --header-h: 56px;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ─── LAYOUT ─── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--navy-light);
+    border-right: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+    transition: transform 0.25s ease;
+  }
+  .sidebar-logo {
+    padding: 1.25rem 1rem;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-tt svg { width: 28px; height: 28px; }
+  .logo-name { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; }
+  .logo-sub { font-size: 9px; color: var(--orange); letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .sidebar-section {
+    padding: 0.75rem 0.75rem 0.25rem;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.6rem 0.75rem;
+    margin: 1px 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-size: 13px;
+    text-decoration: none;
+    border: none;
+    background: none;
+    width: calc(100% - 1rem);
+    text-align: left;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-item.active { background: var(--orange-dim); color: var(--orange); }
+  .nav-item .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto;
+    background: var(--orange);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 20px;
+    padding: 1px 6px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  .sidebar-bottom {
+    margin-top: auto;
+    padding: 0.75rem;
+    border-top: 0.5px solid var(--border);
+  }
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .user-row:hover { background: rgba(255,255,255,0.05); }
+  .user-avatar {
+    width: 30px; height: 30px;
+    background: var(--orange-dim);
+    border: 0.5px solid var(--orange-border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--orange);
+    flex-shrink: 0;
+  }
+  .user-name { font-size: 12px; font-weight: 500; }
+  .user-role { font-size: 10px; color: var(--text-secondary); }
+  .logout-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .logout-btn:hover { color: var(--red); }
+
+  /* ─── MAIN ─── */
+  .main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    height: var(--header-h);
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    background: var(--navy);
+    z-index: 50;
+  }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--text-secondary); margin-left: 4px; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--orange); color: white; }
+  .btn-primary:hover { background: var(--orange-hover); }
+  .btn-ghost {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+    border: 0.5px solid var(--border);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  /* ─── CONTENT ─── */
+  .content { padding: 1.5rem; flex: 1; }
+
+  /* ─── STATS GRID ─── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--navy-card);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: border-color 0.15s;
+  }
+  .stat-card:hover { border-color: var(--border-hover); }
+  .stat-header { display: flex; align-items: center; justify-content: space-between; }
+  .stat-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; letter-spacing: 0.03em; }
+  .stat-icon {
+    width: 28px; height: 28px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .stat-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  .stat-footer { font-size: 11px; color: var(--text-tertiary); }
+  .stat-footer span { color: var(--green); }
+
+  /* ─── GRID 2 COL ─── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .grid-3-1 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* ─── CARD ─── */
+  .card {
+    background: var(--navy-card);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 0.85rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-title { font-size: 13px; font-weight: 600; }
+  .card-action {
+    font-size: 12px;
+    color: var(--orange);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    transition: opacity 0.15s;
+  }
+  .card-action:hover { opacity: 0.8; }
+  .card-body { padding: 1rem 1.25rem; }
+  .card-empty {
+    padding: 2rem 1.25rem;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 13px;
+  }
+
+  /* ─── OBRAS LIST ─── */
+  .site-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 0.5px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    margin: 0 -1.25rem;
+    padding: 0.75rem 1.25rem;
+  }
+  .site-item:last-child { border-bottom: none; }
+  .site-item:hover { background: rgba(255,255,255,0.03); }
+  .site-thumb {
+    width: 38px; height: 38px;
+    background: var(--orange-dim);
+    border: 0.5px solid var(--orange-border);
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .site-info { flex: 1; min-width: 0; }
+  .site-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .site-client { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .site-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .progress-wrap { display: flex; align-items: center; gap: 6px; }
+  .progress-bar {
+    width: 60px; height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.4s; }
+  .progress-pct { font-size: 11px; color: var(--text-secondary); min-width: 28px; text-align: right; }
+
+  /* ─── STATUS BADGE ─── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-orange { background: var(--orange-dim); color: var(--orange); }
+  .badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* ─── VISITS LIST ─── */
+  .visit-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    margin: 0 -1.25rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .visit-item:last-child { border-bottom: none; }
+  .visit-item:hover { background: rgba(255,255,255,0.03); }
+  .visit-date-box {
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .visit-day { font-size: 18px; font-weight: 700; line-height: 1; color: var(--orange); }
+  .visit-month { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .visit-info { flex: 1; min-width: 0; }
+  .visit-site { font-size: 13px; font-weight: 500; }
+  .visit-pilot { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* ─── REQUESTS LIST ─── */
+  .req-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    margin: 0 -1.25rem;
+  }
+  .req-item:last-child { border-bottom: none; }
+  .req-icon {
+    width: 30px; height: 30px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .req-info { flex: 1; }
+  .req-title { font-size: 13px; font-weight: 500; }
+  .req-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .req-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .btn-xs {
+    padding: 0.25rem 0.6rem;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-xs-green { background: var(--green-dim); color: var(--green); }
+  .btn-xs-green:hover { background: rgba(34,197,94,0.2); }
+  .btn-xs-red { background: var(--red-dim); color: var(--red); }
+  .btn-xs-red:hover { background: rgba(239,68,68,0.2); }
+
+  /* ─── QUICK ACTIONS ─── */
+  .quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .quick-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 1rem 0.5rem;
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+  }
+  .quick-btn:hover { background: var(--orange-dim); border-color: var(--orange-border); color: var(--orange); }
+  .quick-btn .q-icon { font-size: 20px; }
+
+  /* ─── CHART ─── */
+  .chart-wrap { padding: 0.5rem 0; height: 180px; position: relative; }
+
+  /* ─── MODAL ─── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--navy-light);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close {
+    background: none; border: none;
+    color: var(--text-secondary);
+    cursor: pointer; font-size: 20px;
+    padding: 2px;
+    transition: color 0.15s;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 1.25rem; }
+  .modal-footer {
+    padding: 1rem 1.25rem;
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ─── FORM ─── */
+  .form-group { margin-bottom: 1rem; }
+  .form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .form-input, .form-select, .form-textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 0.5px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: var(--orange);
+  }
+  .form-input::placeholder, .form-textarea::placeholder { color: rgba(255,255,255,0.2); }
+  .form-select option { background: var(--navy-light); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+  /* ─── LOADING ─── */
+  .loading-screen {
+    position: fixed; inset: 0;
+    background: var(--navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .loading-screen.hidden { display: none; }
+  .spin {
+    width: 32px; height: 32px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: var(--orange);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── TOAST ─── */
+  .toast {
+    position: fixed;
+    bottom: 1.5rem; right: 1.5rem;
+    background: var(--navy-light);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.25s;
+    z-index: 300;
+    max-width: 320px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-success { border-left: 3px solid var(--green); }
+  .toast-error { border-left: 3px solid var(--red); }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3-1 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .sidebar {
+      transform: translateX(-100%);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .menu-toggle { display: block; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .content { padding: 1rem; }
+  }
+
+  /* OVERLAY MOBILE */
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+  }
+  .sidebar-overlay.open { display: block; }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <svg width="32" height="32" viewBox="0 0 100 100"><path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/></svg>
+  <div class="spin"></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-tt">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">OTTUS</div>
+        <div class="logo-sub">Portal de Obras</div>
+      </div>
+    </div>
+
+    <div style="overflow-y:auto;flex:1">
+      <div class="sidebar-section">Principal</div>
+      <button class="nav-item active" onclick="navigate('dashboard')">
+        <span class="nav-icon">⊞</span> Dashboard
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_obras.html'">
+        <span class="nav-icon">🏗</span> Obras
+        <span class="nav-badge" id="badgeObras" style="display:none">0</span>
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_clientes.html'">
+        <span class="nav-icon">🏢</span> Clientes
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_visitas.html'">
+        <span class="nav-icon">📋</span> Visitas
+        <span class="nav-badge" id="badgeVisitas" style="display:none">0</span>
+      </button>
+
+      <div class="sidebar-section">Operacional</div>
+      <button class="nav-item" onclick="window.location.href='ottus_solicitacoes.html'">
+        <span class="nav-icon">📅</span> Solicitações
+        <span class="nav-badge" id="badgeSolicitacoes" style="display:none">0</span>
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_usuarios.html'">
+        <span class="nav-icon">👤</span> Usuários
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_servicos.html'">
+        <span class="nav-icon">⚡</span> Serviços
+      </button>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="user-row">
+        <div class="user-avatar" id="userAvatar">I</div>
+        <div>
+          <div class="user-name" id="userName">Carregando...</div>
+          <div class="user-role">Administrador</div>
+        </div>
+        <button class="logout-btn" onclick="logout()" title="Sair">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- HEADER -->
+    <header class="header">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+      <div>
+        <span class="header-title">Dashboard</span>
+        <span class="header-sub" id="headerDate"></span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" onclick="openModal('modalCliente')">+ Cliente</button>
+        <button class="btn btn-primary" onclick="openModal('modalObra')">+ Obra</button>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- STATS -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <div class="stat-label">Obras Ativas</div>
+            <div class="stat-icon" style="background:var(--orange-dim)">🏗</div>
+          </div>
+          <div class="stat-value" id="statObras">—</div>
+          <div class="stat-footer" id="statObrasFooter">carregando...</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <div class="stat-label">Clientes</div>
+            <div class="stat-icon" style="background:var(--blue-dim)">🏢</div>
+          </div>
+          <div class="stat-value" id="statClientes">—</div>
+          <div class="stat-footer" id="statClientesFooter">carregando...</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <div class="stat-label">Aguardando Publicação</div>
+            <div class="stat-icon" style="background:var(--yellow-dim)">⏳</div>
+          </div>
+          <div class="stat-value" id="statPendentes">—</div>
+          <div class="stat-footer">relatórios com mídia pendente</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <div class="stat-label">Solicitações</div>
+            <div class="stat-icon" style="background:var(--green-dim)">📅</div>
+          </div>
+          <div class="stat-value" id="statSolicitacoes">—</div>
+          <div class="stat-footer">aguardando confirmação</div>
+        </div>
+      </div>
+
+      <!-- ROW 1 -->
+      <div class="grid-3-1">
+
+        <!-- OBRAS ATIVAS -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Obras Ativas</div>
+            <button class="card-action" onclick="window.location.href='ottus_obras.html'">Ver todas →</button>
+          </div>
+          <div class="card-body" id="listaObras">
+            <div class="card-empty">Carregando obras...</div>
+          </div>
+        </div>
+
+        <!-- AÇÕES RÁPIDAS -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Ações Rápidas</div>
+          </div>
+          <div class="card-body">
+            <div class="quick-grid">
+              <button class="quick-btn" onclick="openModal('modalCliente')">
+                <span class="q-icon">🏢</span>
+                Novo Cliente
+              </button>
+              <button class="quick-btn" onclick="openModal('modalObra')">
+                <span class="q-icon">🏗</span>
+                Nova Obra
+              </button>
+              <button class="quick-btn" onclick="openModal('modalVisita')">
+                <span class="q-icon">📋</span>
+                Nova Visita
+              </button>
+              <button class="quick-btn" onclick="openModal('modalUsuario')">
+                <span class="q-icon">👤</span>
+                Novo Usuário
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ROW 2 -->
+      <div class="grid-2">
+
+        <!-- PRÓXIMAS VISITAS -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Próximas Visitas</div>
+            <button class="card-action" onclick="window.location.href='ottus_visitas.html'">Ver todas →</button>
+          </div>
+          <div id="listaVisitas">
+            <div class="card-empty">Carregando visitas...</div>
+          </div>
+        </div>
+
+        <!-- SOLICITAÇÕES PENDENTES -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Solicitações Pendentes</div>
+            <button class="card-action" onclick="window.location.href='ottus_solicitacoes.html'">Ver todas →</button>
+          </div>
+          <div id="listaSolicitacoes">
+            <div class="card-empty">Nenhuma solicitação pendente</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL NOVO CLIENTE ─── -->
+<div class="modal-overlay" id="modalCliente">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Novo Cliente</div>
+      <button class="modal-close" onclick="closeModal('modalCliente')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nome da empresa *</label>
+        <input class="form-input" id="clienteNome" placeholder="Ex: Construtora Alphaville" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">CNPJ</label>
+        <input class="form-input" id="clienteCNPJ" placeholder="00.000.000/0000-00" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Link Google Drive</label>
+        <input class="form-input" id="clienteDrive" placeholder="https://drive.google.com/..." />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalCliente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="criarCliente()">Criar Cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL NOVA OBRA ─── -->
+<div class="modal-overlay" id="modalObra">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nova Obra</div>
+      <button class="modal-close" onclick="closeModal('modalObra')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Cliente *</label>
+        <select class="form-select" id="obraCliente">
+          <option value="">Selecione o cliente...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nome da obra *</label>
+        <input class="form-input" id="obraNome" placeholder="Ex: Edifício Alphaville Torre A" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Endereço</label>
+        <input class="form-input" id="obraEndereco" placeholder="Rua, número, cidade" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Início do monitoramento</label>
+          <input class="form-input" id="obraInicio" type="date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Previsão de término</label>
+          <input class="form-input" id="obraFim" type="date" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Frequência de visitas</label>
+          <select class="form-select" id="obraFrequencia">
+            <option value="quinzenal">Quinzenal</option>
+            <option value="mensal">Mensal</option>
+            <option value="semanal">Semanal</option>
+            <option value="sob demanda">Sob demanda</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Próxima visita</label>
+          <input class="form-input" id="obraProximaVisita" type="date" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Link Google Drive da obra</label>
+        <input class="form-input" id="obraDrive" placeholder="https://drive.google.com/..." />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalObra')">Cancelar</button>
+      <button class="btn btn-primary" onclick="criarObra()">Criar Obra</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL NOVA VISITA ─── -->
+<div class="modal-overlay" id="modalVisita">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nova Visita</div>
+      <button class="modal-close" onclick="closeModal('modalVisita')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Obra *</label>
+        <select class="form-select" id="visitaObra">
+          <option value="">Selecione a obra...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Piloto *</label>
+        <select class="form-select" id="visitaPiloto">
+          <option value="">Selecione o piloto...</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Data da visita *</label>
+          <input class="form-input" id="visitaData" type="date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Horário de início</label>
+          <input class="form-input" id="visitaHorario" type="time" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalVisita')">Cancelar</button>
+      <button class="btn btn-primary" onclick="criarVisita()">Criar Visita</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL NOVO USUÁRIO ─── -->
+<div class="modal-overlay" id="modalUsuario">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Novo Usuário</div>
+      <button class="modal-close" onclick="closeModal('modalUsuario')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nome completo *</label>
+        <input class="form-input" id="usuarioNome" placeholder="Nome do usuário" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-mail *</label>
+        <input class="form-input" id="usuarioEmail" type="email" placeholder="email@empresa.com" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Senha temporária *</label>
+        <input class="form-input" id="usuarioSenha" type="password" placeholder="Mínimo 6 caracteres" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Perfil *</label>
+        <select class="form-select" id="usuarioRole">
+          <option value="pilot">Piloto</option>
+          <option value="client_manager">Gestor de Cliente</option>
+          <option value="client_site">Acesso à Obra</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">WhatsApp</label>
+        <input class="form-input" id="usuarioPhone" placeholder="11999999999" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalUsuario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="criarUsuario()">Criar Usuário</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SUPABASE ───
+const SUPABASE_URL = 'https://zjjinojrghquzeqrdmoj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_uJmCKXdFbkU6-nSkYChkRQ_whLqPdE8';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── ESTADO ───
+let currentUser = null;
+let clientes = [];
+let obras = [];
+let pilotos = [];
+
+// ─── INIT ───
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    window.location.href = 'ottus_login.html';
+    return;
+  }
+
+  // Busca dados do usuário
+  const { data: userData } = await sb
+    .from('users')
+    .select('*')
+    .eq('id', session.user.id)
+    .single();
+
+  if (!userData || userData.role !== 'admin') {
+    await sb.auth.signOut();
+    window.location.href = 'ottus_login.html';
+    return;
+  }
+
+  currentUser = userData;
+  document.getElementById('userName').textContent = userData.name || 'Admin';
+  document.getElementById('userAvatar').textContent = (userData.name || 'A')[0].toUpperCase();
+
+  // Data no header
+  const now = new Date();
+  document.getElementById('headerDate').textContent =
+    now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  await Promise.all([
+    carregarStats(),
+    carregarObras(),
+    carregarVisitas(),
+    carregarSolicitacoes(),
+    carregarSelects(),
+  ]);
+
+  document.getElementById('loadingScreen').classList.add('hidden');
+}
+
+// ─── STATS ───
+async function carregarStats() {
+  const [
+    { count: totalObras },
+    { count: totalClientes },
+    { count: pendentes },
+    { count: solicitacoes },
+  ] = await Promise.all([
+    sb.from('sites').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    sb.from('clients').select('*', { count: 'exact', head: true }).eq('active', true),
+    sb.from('visits').select('*', { count: 'exact', head: true }).in('status', ['draft', 'awaiting_media']),
+    sb.from('visit_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+  ]);
+
+  document.getElementById('statObras').textContent = totalObras ?? 0;
+  document.getElementById('statClientes').textContent = totalClientes ?? 0;
+  document.getElementById('statPendentes').textContent = pendentes ?? 0;
+  document.getElementById('statSolicitacoes').textContent = solicitacoes ?? 0;
+
+  document.getElementById('statObrasFooter').textContent =
+    `${totalObras ?? 0} obra${totalObras !== 1 ? 's' : ''} em andamento`;
+  document.getElementById('statClientesFooter').textContent =
+    `${totalClientes ?? 0} cliente${totalClientes !== 1 ? 's' : ''} ativos`;
+
+  // Badges sidebar
+  if (pendentes > 0) {
+    const b = document.getElementById('badgeVisitas');
+    b.textContent = pendentes; b.style.display = 'inline';
+  }
+  if (solicitacoes > 0) {
+    const b = document.getElementById('badgeSolicitacoes');
+    b.textContent = solicitacoes; b.style.display = 'inline';
+  }
+  if (totalObras > 0) {
+    const b = document.getElementById('badgeObras');
+    b.textContent = totalObras; b.style.display = 'inline';
+  }
+}
+
+// ─── OBRAS ───
+async function carregarObras() {
+  const { data } = await sb
+    .from('sites')
+    .select('*, clients(company_name)')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(6);
+
+  obras = data || [];
+  const el = document.getElementById('listaObras');
+
+  if (!obras.length) {
+    el.innerHTML = `<div class="card-empty">Nenhuma obra ativa.<br><button class="btn btn-primary" style="margin-top:0.75rem" onclick="openModal('modalObra')">Criar primeira obra</button></div>`;
+    return;
+  }
+
+  el.innerHTML = obras.map(o => `
+    <div class="site-item" onclick="toast('Em breve: página da obra', 'success')">
+      <div class="site-thumb">🏗</div>
+      <div class="site-info">
+        <div class="site-name">${o.name}</div>
+        <div class="site-client">${o.clients?.company_name || '—'}</div>
+      </div>
+      <div class="site-meta">
+        <span class="badge badge-green"><span class="badge-dot"></span>Ativa</span>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" style="width:0%" data-site="${o.id}"></div></div>
+          <span class="progress-pct">—</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Busca progresso de cada obra
+  for (const obra of obras) {
+    const { data: lastVisit } = await sb
+      .from('visits')
+      .select('progress_pct')
+      .eq('site_id', obra.id)
+      .eq('status', 'published')
+      .order('visit_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (lastVisit) {
+      const fill = el.querySelector(`[data-site="${obra.id}"]`);
+      if (fill) {
+        fill.style.width = `${lastVisit.progress_pct}%`;
+        fill.parentElement.nextElementSibling.textContent = `${lastVisit.progress_pct}%`;
+      }
+    }
+  }
+}
+
+// ─── VISITAS ───
+async function carregarVisitas() {
+  const hoje = new Date().toISOString().split('T')[0];
+  const { data } = await sb
+    .from('visits')
+    .select('*, sites(name), users!visits_pilot_id_fkey(name)')
+    .gte('visit_date', hoje)
+    .order('visit_date', { ascending: true })
+    .limit(5);
+
+  const el = document.getElementById('listaVisitas');
+
+  if (!data?.length) {
+    el.innerHTML = `<div class="card-empty">Nenhuma visita agendada.<br><button class="btn btn-ghost" style="margin-top:0.75rem;font-size:12px" onclick="openModal('modalVisita')">+ Agendar visita</button></div>`;
+    return;
+  }
+
+  el.innerHTML = data.map(v => {
+    const d = new Date(v.visit_date + 'T00:00:00');
+    const dia = d.getDate().toString().padStart(2, '0');
+    const mes = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    const statusMap = {
+      draft: { label: 'Rascunho', cls: 'badge-yellow' },
+      awaiting_media: { label: 'Ag. mídia', cls: 'badge-orange' },
+      published: { label: 'Publicado', cls: 'badge-green' },
+    };
+    const s = statusMap[v.status] || statusMap.draft;
+    return `
+      <div class="visit-item">
+        <div class="visit-date-box">
+          <div class="visit-day">${dia}</div>
+          <div class="visit-month">${mes}</div>
+        </div>
+        <div class="visit-info">
+          <div class="visit-site">${v.sites?.name || '—'}</div>
+          <div class="visit-pilot">${v.users?.name || 'Piloto não atribuído'}</div>
+        </div>
+        <span class="badge ${s.cls}">${s.label}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── SOLICITAÇÕES ───
+async function carregarSolicitacoes() {
+  const { data } = await sb
+    .from('visit_requests')
+    .select('*, sites(name), users!visit_requests_requested_by_fkey(name)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  const el = document.getElementById('listaSolicitacoes');
+
+  if (!data?.length) {
+    el.innerHTML = `<div class="card-empty">Nenhuma solicitação pendente</div>`;
+    return;
+  }
+
+  el.innerHTML = data.map(r => {
+    const tipo = r.type === 'additional' ? 'Visita adicional' : 'Antecipar visita';
+    const dataDesejada = r.desired_date
+      ? new Date(r.desired_date + 'T00:00:00').toLocaleDateString('pt-BR')
+      : 'Data não informada';
+    return `
+      <div class="req-item">
+        <div class="req-icon" style="background:var(--yellow-dim)">📅</div>
+        <div class="req-info">
+          <div class="req-title">${tipo} — ${r.sites?.name || '—'}</div>
+          <div class="req-sub">${r.users?.name || '—'} · ${dataDesejada}${r.notes ? ' · ' + r.notes : ''}</div>
+          <div class="req-actions">
+            <button class="btn-xs btn-xs-green" onclick="responderSolicitacao('${r.id}', 'confirmed')">✓ Confirmar</button>
+            <button class="btn-xs btn-xs-red" onclick="responderSolicitacao('${r.id}', 'declined')">✗ Recusar</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── SELECTS ───
+async function carregarSelects() {
+  const [{ data: cls }, { data: sitesList }, { data: pilots }] = await Promise.all([
+    sb.from('clients').select('id, company_name').eq('active', true).order('company_name'),
+    sb.from('sites').select('id, name').eq('status', 'active').order('name'),
+    sb.from('users').select('id, name').in('role', ['admin', 'pilot']).eq('active', true),
+  ]);
+
+  clientes = cls || [];
+  pilotos = pilots || [];
+
+  const selCliente = document.getElementById('obraCliente');
+  clientes.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.company_name;
+    selCliente.appendChild(o);
+  });
+
+  const selObra = document.getElementById('visitaObra');
+  (sitesList || []).forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id; o.textContent = s.name;
+    selObra.appendChild(o);
+  });
+
+  const selPiloto = document.getElementById('visitaPiloto');
+  pilotos.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id; o.textContent = p.name;
+    selPiloto.appendChild(o);
+  });
+}
+
+// ─── CRIAR CLIENTE ───
+async function criarCliente() {
+  const nome = document.getElementById('clienteNome').value.trim();
+  if (!nome) { toast('Informe o nome da empresa', 'error'); return; }
+
+  const { error } = await sb.from('clients').insert({
+    company_name: nome,
+    cnpj: document.getElementById('clienteCNPJ').value.trim() || null,
+    drive_folder_url: document.getElementById('clienteDrive').value.trim() || null,
+  });
+
+  if (error) { toast('Erro ao criar cliente: ' + error.message, 'error'); return; }
+  toast('Cliente criado com sucesso!', 'success');
+  closeModal('modalCliente');
+  document.getElementById('clienteNome').value = '';
+  document.getElementById('clienteCNPJ').value = '';
+  document.getElementById('clienteDrive').value = '';
+  await Promise.all([carregarStats(), carregarSelects()]);
+}
+
+// ─── CRIAR OBRA ───
+async function criarObra() {
+  const clienteId = document.getElementById('obraCliente').value;
+  const nome = document.getElementById('obraNome').value.trim();
+  if (!clienteId) { toast('Selecione o cliente', 'error'); return; }
+  if (!nome) { toast('Informe o nome da obra', 'error'); return; }
+
+  const { error } = await sb.from('sites').insert({
+    client_id: clienteId,
+    name: nome,
+    address: document.getElementById('obraEndereco').value.trim() || null,
+    start_date: document.getElementById('obraInicio').value || null,
+    expected_end_date: document.getElementById('obraFim').value || null,
+    visit_frequency: document.getElementById('obraFrequencia').value,
+    next_visit_date: document.getElementById('obraProximaVisita').value || null,
+    drive_folder_url: document.getElementById('obraDrive').value.trim() || null,
+    status: 'active',
+  });
+
+  if (error) { toast('Erro ao criar obra: ' + error.message, 'error'); return; }
+  toast('Obra criada com sucesso!', 'success');
+  closeModal('modalObra');
+  await Promise.all([carregarStats(), carregarObras(), carregarSelects()]);
+}
+
+// ─── CRIAR VISITA ───
+async function criarVisita() {
+  const siteId = document.getElementById('visitaObra').value;
+  const pilotoId = document.getElementById('visitaPiloto').value;
+  const data = document.getElementById('visitaData').value;
+  if (!siteId) { toast('Selecione a obra', 'error'); return; }
+  if (!pilotoId) { toast('Selecione o piloto', 'error'); return; }
+  if (!data) { toast('Informe a data', 'error'); return; }
+
+  const { error } = await sb.from('visits').insert({
+    site_id: siteId,
+    pilot_id: pilotoId,
+    visit_date: data,
+    start_time: document.getElementById('visitaHorario').value || null,
+    status: 'draft',
+  });
+
+  if (error) { toast('Erro ao criar visita: ' + error.message, 'error'); return; }
+  toast('Visita agendada com sucesso!', 'success');
+  closeModal('modalVisita');
+  await Promise.all([carregarStats(), carregarVisitas()]);
+}
+
+// ─── CRIAR USUÁRIO ───
+async function criarUsuario() {
+  const nome = document.getElementById('usuarioNome').value.trim();
+  const email = document.getElementById('usuarioEmail').value.trim();
+  const senha = document.getElementById('usuarioSenha').value;
+  const role = document.getElementById('usuarioRole').value;
+  const phone = document.getElementById('usuarioPhone').value.trim();
+
+  if (!nome || !email || !senha) { toast('Preencha os campos obrigatórios', 'error'); return; }
+  if (senha.length < 6) { toast('Senha mínimo 6 caracteres', 'error'); return; }
+
+  // Cria o usuário via auth admin — precisa da service role key
+  // Por ora, instrui o usuário a criar manualmente no Supabase
+  toast('Para criar usuários, acesse Authentication → Users no Supabase e depois atualize o role manualmente.', 'error');
+}
+
+// ─── RESPONDER SOLICITAÇÃO ───
+async function responderSolicitacao(id, status) {
+  const { error } = await sb
+    .from('visit_requests')
+    .update({ status })
+    .eq('id', id);
+
+  if (error) { toast('Erro ao atualizar solicitação', 'error'); return; }
+  toast(status === 'confirmed' ? 'Solicitação confirmada!' : 'Solicitação recusada', 'success');
+  await Promise.all([carregarStats(), carregarSolicitacoes()]);
+}
+
+// ─── MODALS ───
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => {
+    if (e.target === m) m.classList.remove('open');
+  });
+});
+
+// ─── NAVIGATE ───
+function navigate(page) {
+  const routes = {
+    obras: 'ottus_obras.html',
+    clientes: 'ottus_clientes.html',
+    visitas: 'ottus_visitas.html',
+    solicitacoes: 'ottus_solicitacoes.html',
+    usuarios: 'ottus_usuarios.html',
+    servicos: 'ottus_servicos.html',
+  };
+  if (routes[page]) window.location.href = routes[page];
+  else toast('Em breve: ' + page, 'success');
+}
+
+// ─── SIDEBAR MOBILE ───
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+// ─── TOAST ───
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.className = `toast toast-${type} show`;
+  el.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ─── LOGOUT ───
+async function logout() {
+  await sb.auth.signOut();
+  window.location.href = 'ottus_login.html';
+}
+
+// ─── START ───
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>OTTUS — Relatório de Visita</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #091c2b;
+    --navy-light: #0d2438;
+    --navy-card: #0f2a3d;
+    --orange: #d85a30;
+    --orange-hover: #c04e28;
+    --orange-dim: rgba(216,90,48,0.12);
+    --orange-border: rgba(216,90,48,0.25);
+    --text: #ffffff;
+    --text-secondary: rgba(255,255,255,0.55);
+    --text-tertiary: rgba(255,255,255,0.3);
+    --border: rgba(255,255,255,0.08);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  /* ─ ATMOSFERA ─ */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(216,90,48,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -20%;
+    right: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(ellipse, rgba(216,90,48,0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: #060f18;
+    color: var(--text);
+    font-size: 16px;
+    overscroll-behavior: none;
+  }
+  /* Desktop wrapper */
+  .mobile-frame {
+    max-width: 390px;
+    margin: 0 auto;
+    background: var(--navy);
+    min-height: 100vh;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  }
+  @media (max-width: 390px) {
+    .mobile-frame { box-shadow: none; }
+  }
+
+  /* ─── LOADING ─── */
+  .loading-screen { position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 390px; height: 100%; background: var(--navy); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; z-index: 999; }
+  .loading-screen.hidden { display: none; }
+  .spin { width: 36px; height: 36px; border: 2.5px solid rgba(255,255,255,0.1); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── TOAST ─── */
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--navy-light); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1.25rem; font-size: 14px; display: flex; align-items: center; gap: 8px; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast-success { border-left: 3px solid var(--green); }
+  .toast-error { border-left: 3px solid var(--red); }
+
+  /* ─── HEADER ─── */
+  .top-bar { background: var(--navy-light); border-bottom: 0.5px solid var(--border); padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 50; height: 54px; }
+  .top-bar::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 1rem; right: 1rem;
+    height: 0.5px;
+    background: linear-gradient(90deg, transparent, rgba(216,90,48,0.35), transparent);
+    pointer-events: none;
+  }
+  .top-logo { width: 24px; height: 24px; flex-shrink: 0; }
+  .top-logo svg { width: 24px; height: 24px; flex-shrink: 0; }
+  .top-title { font-size: 14px; font-weight: 700; letter-spacing: 0.03em; line-height: 1; }
+  .top-subtitle { font-size: 10px; color: var(--orange); letter-spacing: 0.08em; text-transform: uppercase; line-height: 1; margin-top: 2px; }
+  .top-right { margin-left: auto; }
+  .btn-logout { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 18px; padding: 4px; line-height: 1; }
+
+  /* ─── CONTENT ─── */
+  .content { padding: 1.25rem; max-width: 390px; margin: 0 auto; padding-bottom: 1.5rem; }
+
+  /* ─── MINHA VISITA (lista de visitas atribuídas) ─── */
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 8px; }
+  .section-label::before { content: ""; display: inline-block; width: 2px; height: 10px; background: var(--orange); border-radius: 2px; opacity: 0.6; flex-shrink: 0; }
+  .visit-select-card { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
+  .visit-select-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.35); }
+  .visit-select-card:hover, .visit-select-card.selected { border-color: var(--orange); background: var(--orange-dim); }
+  .visit-date-box { text-align: center; min-width: 42px; }
+  .visit-day { font-size: 22px; font-weight: 700; color: var(--orange); line-height: 1; }
+  .visit-month { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; }
+  .visit-info { flex: 1; }
+  .visit-obra { font-size: 15px; font-weight: 600; }
+  .visit-client { font-size: 12px; color: var(--orange); margin-top: 2px; }
+  .visit-addr { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .visit-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-draft { background: var(--text-tertiary); }
+  .dot-active { background: var(--orange); }
+
+  /* ─── WIZARD ─── */
+  .wizard { display: none; }
+  .wizard.active { display: block; }
+
+  /* PROGRESS BAR */
+  .wizard-progress { padding: 0 1.25rem 0; background: var(--navy-light); border-bottom: 0.5px solid var(--border); position: sticky; top: 54px; z-index: 40; }
+  .progress-steps { display: flex; align-items: center; gap: 0; padding: 0.75rem 0; }
+  .step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; transition: all 0.2s; }
+  .step-dot.done { background: var(--green); color: white; }
+  .step-dot.current { background: var(--orange); color: white; box-shadow: 0 0 10px rgba(216,90,48,0.5); }
+  .step-dot.pending { background: rgba(255,255,255,0.08); color: var(--text-tertiary); }
+  .step-line { flex: 1; height: 1px; background: rgba(255,255,255,0.1); transition: background 0.3s; }
+  .step-line.done { background: var(--orange); opacity: 0.6; }
+  .step-label { font-size: 11px; color: var(--text-tertiary); text-align: center; padding: 0 0 0.5rem; margin-top: -4px; }
+
+  /* STEP CONTENT */
+  .step-content { padding: 1.25rem; max-width: 390px; margin: 0 auto; padding-bottom: 6rem; }
+  .step-title { font-size: 20px; font-weight: 700; margin-bottom: 0.25rem; }
+  .step-subtitle { font-size: 13px; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5; }
+
+  /* OBRA INFO CARD */
+  .obra-info-card { background: var(--orange-dim); border: 0.5px solid var(--orange-border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-bottom: 1.5rem;  border-left: 2px solid var(--orange); }
+  .obra-info-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .obra-info-client { font-size: 12px; color: var(--orange); }
+  .obra-info-addr { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* TIMESTAMP BUTTONS */
+  .timestamp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+  .timestamp-btn { background: rgba(34,197,94,0.04); border: 0.5px solid rgba(34,197,94,0.2); border-radius: var(--radius); padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+  .timestamp-btn:active { transform: scale(0.97); }
+  .timestamp-btn.done { border-color: var(--green); background: var(--green-dim); }
+  .timestamp-btn.done .ts-icon { color: var(--green); font-size: 28px; display: block; margin-bottom: 4px; line-height: 1; }
+  .ts-icon { font-size: 24px; margin-bottom: 0.4rem; display: block; color: var(--orange); }
+  .ts-label { font-size: 11px; font-weight: 500; color: var(--text-tertiary); margin-bottom: 4px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .ts-time { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1; }
+  .ts-time.empty { font-size: 13px; color: var(--text-tertiary); font-weight: 400; }
+  .ts-tap { display: none; }
+
+  /* DURATION */
+  .duration-display { background: rgba(255,255,255,0.03); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 4px; }
+  .duration-label { font-size: 12px; color: var(--text-secondary); }
+  .duration-value { font-size: 16px; font-weight: 700; color: var(--orange); }
+
+  /* FORM ELEMENTS */
+  .form-group { margin-bottom: 1.25rem; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-input, .form-select, .form-textarea { width: 100%; background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; color: var(--text); font-size: 16px; outline: none; transition: border-color 0.15s; -webkit-appearance: none; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--orange); }
+  .form-input::placeholder, .form-textarea::placeholder { color: rgba(255,255,255,0.2); }
+  .form-select option { background: var(--navy-light); }
+  .form-textarea { resize: none; min-height: 90px; font-family: inherit; }
+
+  /* CLIMA BUTTONS */
+  .clima-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 1.25rem; }
+  .clima-btn { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.65rem 0.25rem; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .clima-btn:active { transform: scale(0.95); }
+  .clima-btn.selected { border-color: var(--orange); background: var(--orange-dim); }
+  .clima-icon { font-size: 22px; display: block; margin-bottom: 4px; }
+  .clima-label { font-size: 9px; color: var(--text-tertiary); display: block; line-height: 1.2; }
+  .clima-btn.selected .clima-label { color: var(--orange); }
+
+  /* PROGRESSO SLIDER */
+  .pct-display { text-align: center; margin-bottom: 1rem; }
+  .pct-number { font-size: 56px; font-weight: 800; color: var(--orange); line-height: 1; }
+  .pct-unit { font-size: 20px; color: var(--text-secondary); }
+  .pct-slider { width: 100%; -webkit-appearance: none; appearance: none; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; outline: none; margin-bottom: 0.5rem; }
+  .pct-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: var(--orange); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 8px rgba(216,90,48,0.4); }
+  .pct-marks { display: flex; justify-content: space-between; margin-bottom: 1.5rem; }
+  .pct-mark { font-size: 10px; color: var(--text-tertiary); }
+
+  /* PONTOS DE ATENÇÃO */
+  .attention-list { margin-bottom: 1rem; }
+  .attention-item { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-bottom: 0.5rem; position: relative; }
+  .attention-num { font-size: 10px; font-weight: 700; color: var(--orange); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+  .attention-remove { position: absolute; top: 0.75rem; right: 0.75rem; background: var(--red-dim); border: none; color: var(--red); cursor: pointer; font-size: 16px; width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+  .attention-photo { width: 100%; height: 120px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; margin-bottom: 0.5rem; position: relative; overflow: hidden; transition: background 0.15s; }
+  .attention-photo:active { background: rgba(255,255,255,0.08); }
+  .attention-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .attention-photo-label { font-size: 12px; color: var(--text-tertiary); text-align: center; z-index: 1; }
+  .attention-photo-icon { font-size: 24px; margin-bottom: 4px; }
+  .attention-input { width: 100%; background: rgba(255,255,255,0.05); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.65rem 0.75rem; color: var(--text); font-size: 15px; outline: none; margin-bottom: 0.5rem; font-family: inherit; }
+  .attention-input:focus { border-color: var(--orange); }
+  .attention-input::placeholder { color: rgba(255,255,255,0.2); }
+  .btn-add-point { width: 100%; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); border-radius: var(--radius-sm); padding: 0.85rem; color: var(--text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; }
+  .btn-add-point:active { background: rgba(255,255,255,0.08); }
+
+  /* REVISÃO */
+  .review-section { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
+  .review-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 0.75rem; font-family: "Syne", sans-serif; display: flex; align-items: center; gap: 8px; }
+  .review-title::before { content: ""; display: inline-block; width: 2px; height: 10px; background: var(--orange); border-radius: 2px; opacity: 0.6; flex-shrink: 0; }
+  .review-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.4rem 0; border-bottom: 0.5px solid var(--border); }
+  .review-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .review-key { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; margin-right: 1rem; }
+  .review-val { font-size: 13px; font-weight: 500; text-align: right; }
+  .review-pct { font-size: 28px; font-weight: 800; color: var(--orange); text-align: center; padding: 0.5rem 0; }
+
+  /* DISCLAIMER */
+  .disclaimer { background: rgba(255,255,255,0.03); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-bottom: 1.5rem; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+  .disclaimer strong { color: var(--text); }
+
+  /* BOTTOM NAV */
+  .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 390px; background: var(--navy-light); border-top: 0.5px solid var(--border); padding: 0.65rem 0.75rem; display: flex; gap: 0.5rem; z-index: 50; }
+  .btn-back { flex: 1; background: transparent; border: 0.5px solid rgba(255,255,255,0.15); border-radius: var(--radius-sm); padding: 0.85rem; color: rgba(255,255,255,0.4); font-size: 16px; cursor: pointer; transition: all 0.15s; min-width: 0; }
+  .btn-next { flex: 3; background: var(--orange); border: none; border-radius: var(--radius-sm); padding: 0.85rem; color: white; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.15s; min-width: 0; letter-spacing: 0.02em; }
+  .btn-next:active { background: var(--orange-hover); transform: scale(0.98); }
+  .btn-back:active { background: rgba(255,255,255,0.1); }
+  .btn-next:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* SIGN BUTTON */
+  .btn-sign { width: 100%; background: linear-gradient(135deg, #1a9e4a 0%, #16a34a 100%); border: none; border-radius: var(--radius-sm); padding: 1.1rem; color: white; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: "Syne", sans-serif; letter-spacing: 0.03em; box-shadow: 0 4px 20px rgba(34,197,94,0.3); position: relative; overflow: hidden; }
+  .btn-sign::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%); pointer-events: none; }
+  .btn-sign:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(34,197,94,0.4); }
+  .btn-sign:active { transform: scale(0.98); opacity: 0.9; }
+
+/* ─── UPLOAD SCREEN ─── */
+  .upload-screen { display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 390px; height: 100%; z-index: 500; background: var(--navy); overflow-y: auto; }
+  .upload-screen.show { display: block; }
+  .upload-zone { border: 1.5px dashed rgba(255,255,255,0.15); border-radius: var(--radius); padding: 2rem 1.25rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem; }
+  .upload-zone:active { background: rgba(255,255,255,0.04); }
+  .upload-zone.has-files { border-color: var(--orange); background: var(--orange-dim); }
+  .upload-zone-icon { font-size: 36px; margin-bottom: 0.75rem; }
+  .upload-zone-title { font-size: 15px; font-weight: 600; margin-bottom: 0.25rem; }
+  .upload-zone-sub { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .media-preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; }
+  .media-thumb { aspect-ratio: 1; border-radius: var(--radius-sm); object-fit: cover; width: 100%; background: var(--navy-card); }
+  .media-thumb-placeholder { aspect-ratio: 1; border-radius: var(--radius-sm); background: var(--navy-card); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-tertiary); text-align: center; padding: 4px; }
+  .upload-count { font-size: 13px; color: var(--orange); font-weight: 600; margin-bottom: 1rem; }
+  .upload-progress-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-bottom: 0.5rem; }
+  .upload-progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.3s; }
+  .upload-status { font-size: 12px; color: var(--text-secondary); margin-bottom: 1.5rem; }
+  .btn-upload-send { width: 100%; background: var(--orange); border: none; border-radius: var(--radius-sm); padding: 1rem; color: white; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; margin-bottom: 0.75rem; }
+  .btn-upload-send:active { opacity: 0.85; transform: scale(0.98); }
+  .btn-upload-send:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-skip-upload { width: 100%; background: none; border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; color: var(--text-secondary); font-size: 14px; cursor: pointer; transition: all 0.15s; }
+  .btn-skip-upload:active { background: rgba(255,255,255,0.04); }
+  .success-screen { display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 390px; height: 100%; z-index: 500; background: var(--navy); flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+  .success-screen.show { display: flex; }
+  .success-icon { width: 72px; height: 72px; background: var(--green-dim); border: 1px solid var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 1.25rem; }
+  .success-title { font-size: 24px; font-weight: 700; margin-bottom: 0.5rem; }
+  .success-sub { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 2rem; }
+  .btn-voltar { background: var(--orange); border: none; border-radius: var(--radius-sm); padding: 0.85rem 2rem; color: white; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+  /* HIDDEN FILE INPUT */
+  .file-input { display: none; }
+
+  /* EMPTY VISITS */
+  .empty-visits { text-align: center; padding: 3rem 1rem; color: var(--text-tertiary); }
+  .empty-visits-icon { font-size: 40px; margin-bottom: 1rem; }
+
+
+  /* CANTEIRO */
+  .canteiro-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1.25rem; }
+  .canteiro-btn { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 0.5rem; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .canteiro-btn:active { transform: scale(0.95); }
+  .canteiro-btn.selected-green { border-color: var(--green); background: var(--green-dim); }
+  .canteiro-btn.selected-yellow { border-color: var(--yellow); background: rgba(245,158,11,0.12); }
+  .canteiro-btn.selected-red { border-color: var(--red); background: var(--red-dim); }
+  .canteiro-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+  .canteiro-label { font-size: 10px; color: var(--text-tertiary); display: block; line-height: 1.2; }
+  .canteiro-btn.selected-green .canteiro-label { color: var(--green); }
+  .canteiro-btn.selected-yellow .canteiro-label { color: var(--yellow); }
+  .canteiro-btn.selected-red .canteiro-label { color: var(--red); }
+
+  /* URGÊNCIA NOS PONTOS */
+  .urgencia-row { display: flex; gap: 6px; margin-bottom: 0.5rem; }
+  .urgencia-btn { flex: 1; padding: 0.4rem 0.25rem; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: none; font-size: 10px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+  .urgencia-btn:active { transform: scale(0.97); }
+  .urgencia-btn.u-normal.sel { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.3); color: white; }
+  .urgencia-btn.u-atencao.sel { background: rgba(245,158,11,0.15); border-color: var(--yellow); color: var(--yellow); }
+  .urgencia-btn.u-critico.sel { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+
+  /* CHECKLIST */
+  .checklist-item { display: flex; align-items: center; gap: 12px; padding: 0.85rem 1rem; background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 0.5rem; cursor: pointer; transition: all 0.15s; user-select: none; }
+  .checklist-item:active { transform: scale(0.99); }
+  .checklist-item.checked { border-color: var(--green); background: var(--green-dim); }
+  .checklist-item.checked.negative { border-color: var(--red); background: var(--red-dim); }
+  .checklist-check { width: 22px; height: 22px; border: 1.5px solid rgba(255,255,255,0.2); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; font-size: 13px; }
+  .checklist-item.checked .checklist-check { background: var(--green); border-color: var(--green); }
+  .checklist-item.checked.negative .checklist-check { background: var(--red); border-color: var(--red); }
+  .checklist-text { font-size: 14px; flex: 1; line-height: 1.4; }
+  .checklist-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+  /* PÓS-ASSINATURA */
+  .pos-screen { display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 390px; height: 100%; z-index: 500; background: var(--navy); overflow-y: auto; scrollbar-width: none; }
+  .pos-screen::-webkit-scrollbar { display: none; }
+  .pos-screen.show { display: block; }
+  .pos-overview { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+  .pos-overview-title { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 0.75rem; }
+  .pos-row { display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
+  .pos-row:last-child { border-bottom: none; }
+  .pos-key { color: var(--text-secondary); }
+  .pos-val { font-weight: 500; text-align: right; max-width: 60%; }
+  .drive-box { background: var(--orange-dim); border: 0.5px solid var(--orange-border); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 12px; }
+  .drive-box-icon { font-size: 28px; flex-shrink: 0; }
+  .drive-box-text { flex: 1; }
+  .drive-box-title { font-size: 13px; font-weight: 600; }
+  .drive-box-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .drive-box-btns { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+  .drive-box-copy { background: var(--orange); border: none; color: white; font-size: 11px; font-weight: 600; padding: 0.35rem 0.65rem; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
+  .drive-box-access { background: transparent; border: 0.5px solid var(--orange-border); color: var(--orange); font-size: 11px; font-weight: 600; padding: 0.35rem 0.65rem; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
+  .btn-solicitar { width: 100%; background: rgba(255,255,255,0.04); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; color: var(--text-secondary); font-size: 14px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.75rem; }
+  .btn-solicitar:active { background: rgba(255,255,255,0.08); }
+  .solicitar-wrap { display: none; margin-bottom: 1rem; }
+  .solicitar-wrap.open { display: block; }
+  .btn-enviar-solicitar { width: 100%; background: var(--orange); border: none; border-radius: var(--radius-sm); padding: 0.85rem; color: white; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 0.5rem; }
+
+  /* AVISO SEM PONTOS NA REVISÃO */
+  .sem-pontos-aviso { background: rgba(245,158,11,0.1); border: 0.5px solid rgba(245,158,11,0.3); border-radius: var(--radius-sm); padding: 0.75rem 1rem; font-size: 12px; color: var(--yellow); margin-bottom: 0.75rem; display: none; }
+  .sem-pontos-aviso.show { display: block; }
+
+  /* VISITA CONCLUÍDA (somente leitura) */
+  .visit-done-card { background: var(--navy-card); border: 0.5px solid rgba(34,197,94,0.3); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.75rem; cursor: pointer; transition: border-color 0.15s; display: flex; align-items: center; gap: 1rem; }
+  .visit-done-badge { background: var(--green-dim); color: var(--green); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+
+  @media (min-width: 481px) {
+    .bottom-nav { left: 50%; transform: translateX(-50%); width: 390px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="mobile-frame">
+<div class="loading-screen" id="loadingScreen">
+  <svg width="36" height="36" viewBox="0 0 100 100"><path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/></svg>
+  <div class="spin"></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SUCCESS FINAL -->
+<!-- success screen removido -->
+
+<!-- HEADER -->
+<div class="top-bar" style="display:flex;align-items:center;gap:40px">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="97 394 835 245" style="height:22px;width:auto;display:block;flex-shrink:0">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-1, .cls-2 {
+        fill-rule: evenodd;
+      }
+
+      .cls-2 {
+        fill: #f1600e;
+      }
+    </style>
+  </defs>
+  <path id="Forma_319_1" data-name="Forma 319 1" class="cls-1" d="M863.922,495.075c-2.727-1.142-32.1-11.141-36.968-19.989s-1.83-29.13,23.979-29.983c20.615-.681,29.5,9.129,38.967,15.991,1.385,1,20.576-27.547,22.98-30.982-54.52-43.7-130.544-21.708-130.888,34.98,0.466,41.317,34.009,52.069,59.971,65.193,6,2.653,36.292,8.934,35.947,32.751,1.312,22.712-24.948,28.058-46.96,22.987-11.926-2.508-32.971-18.989-32.971-18.989S774.418,593.459,773,595.018c7.692,9.889,37.3,31.8,65.944,30.982,32.159-.186,78.638-11.2,79.931-63.964C921.375,519.806,885.307,503.213,863.922,495.075Z"/>
+  <path id="Forma_318_1" data-name="Forma 318 1" class="cls-1" d="M607.031,409h41.991s1,143.378,1,146c-0.009,35.428,31.994,32,31.994,32s32.807,2.926,31.993-32V409H757s-0.213,133.3,0,151c-4.9,69.083-73.985,67-73.985,67s-73.142.7-75.984-67C606.966,543.039,607.031,409,607.031,409Z"/>
+  <path id="Elipse_1" data-name="Elipse 1" class="cls-1" d="M219.055,403.964A112.358,112.358,0,1,1,106.7,516.321,112.358,112.358,0,0,1,219.055,403.964ZM219.005,445c35.9,0,65.007,32.239,65.007,72.008s-29.1,72.007-65.007,72.007S154,556.774,154,517.006,183.1,445,219.005,445Z"/>
+  <path id="Forma_317_1" data-name="Forma 317 1" class="cls-2" d="M337,406H583v41H530V624H486V447H429V624H385V447H337V406Z"/>
+</svg>
+  <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--orange);text-transform:uppercase;font-family:'Syne',sans-serif">Relatório de Obras</div>
+  <div class="top-right" style="margin-left:auto">
+    <button class="btn-logout" onclick="logout()" title="Sair">⏻</button>
+  </div>
+</div>
+
+<!-- ─── TELA DE SELEÇÃO DE VISITA ─── -->
+<div id="telaSelecao">
+  <div class="content">
+    <div class="section-label" style="font-family:'Syne',sans-serif;font-size:12px;font-weight:600" id="pilotoGreeting">Minhas visitas</div>
+    <div id="visitasAtribuidas"></div>
+  </div>
+</div>
+
+<!-- ─── WIZARD ─── -->
+<div class="wizard" id="wizard">
+
+  <!-- PROGRESS -->
+  <div class="wizard-progress">
+    <div class="progress-steps">
+      <div class="step-dot current" id="dot1">1</div>
+      <div class="step-line" id="line1"></div>
+      <div class="step-dot pending" id="dot2">2</div>
+      <div class="step-line" id="line2"></div>
+      <div class="step-dot pending" id="dot3">3</div>
+      <div class="step-line" id="line3"></div>
+      <div class="step-dot pending" id="dot4">4</div>
+      <div class="step-line" id="line4"></div>
+      <div class="step-dot pending" id="dot5">5</div>
+    </div>
+  </div>
+
+  <!-- ETAPA 1 — IDENTIFICAÇÃO -->
+  <div class="step-content" id="step1">
+    <div class="step-title">Identificação</div>
+    
+
+    <div class="obra-info-card" id="obraInfoCard">
+      <div class="obra-info-name" id="obraInfoName">—</div>
+      <div class="obra-info-client" id="obraInfoClient">—</div>
+      <div class="obra-info-addr" id="obraInfoAddr">—</div>
+    </div>
+
+    <!-- BRIEFING DO ADMIN -->
+    <div id="briefingCard" style="display:none;background:rgba(241,196,15,0.08);border:0.5px solid rgba(241,196,15,0.3);border-radius:var(--radius-sm);padding:0.85rem 1rem;margin-bottom:1.25rem">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#f1c40f;margin-bottom:0.4rem">📋 Briefing da visita</div>
+      <div id="briefingTexto" style="font-size:13px;color:var(--text-secondary);line-height:1.6;white-space:pre-line"></div>
+    </div>
+
+    <!-- TIMESTAMPS -->
+    <div class="section-label">Registro de horário</div>
+    <div style="margin-bottom:1.5rem">
+      <div class="timestamp-btn" id="btnChegada" onclick="registrarChegada()" style="max-width:100%">
+        <span class="ts-icon" style="font-size:28px;display:block;margin-bottom:4px">✈️</span>
+        <span class="ts-label">Registrar chegada</span>
+        <span class="ts-time empty" id="tsChegada">Toque para registrar</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Quem recebeu você na obra?</label>
+      <input class="form-input" id="siteContact" placeholder="Nome do encarregado ou responsável" autocomplete="off"/>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Condições climáticas</label>
+      <div class="clima-grid">
+        <div class="clima-btn" onclick="selectClima('sunny')" id="clima-sunny">
+          <span class="clima-icon">☀️</span>
+          <span class="clima-label">Sol</span>
+        </div>
+        <div class="clima-btn" onclick="selectClima('partly_cloudy')" id="clima-partly_cloudy">
+          <span class="clima-icon">⛅</span>
+          <span class="clima-label">Parc. nublado</span>
+        </div>
+        <div class="clima-btn" onclick="selectClima('cloudy')" id="clima-cloudy">
+          <span class="clima-icon">☁️</span>
+          <span class="clima-label">Nublado</span>
+        </div>
+        <div class="clima-btn" onclick="selectClima('light_wind')" id="clima-light_wind">
+          <span class="clima-icon">🌬</span>
+          <span class="clima-label">Vento leve</span>
+        </div>
+        <div class="clima-btn" onclick="selectClima('strong_wind')" id="clima-strong_wind">
+          <span class="clima-icon">💨</span>
+          <span class="clima-label">Vento forte</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Condições do canteiro</label>
+      <div class="canteiro-grid">
+        <div class="canteiro-btn" id="canteiro-organizado" onclick="selectCanteiro('organizado')">
+          <span class="canteiro-icon">✅</span>
+          <span class="canteiro-label">Organizado</span>
+        </div>
+        <div class="canteiro-btn" id="canteiro-parcial" onclick="selectCanteiro('parcial')">
+          <span class="canteiro-icon">⚠️</span>
+          <span class="canteiro-label">Parcialmente organizado</span>
+        </div>
+        <div class="canteiro-btn" id="canteiro-desorganizado" onclick="selectCanteiro('desorganizado')">
+          <span class="canteiro-icon">🚧</span>
+          <span class="canteiro-label">Desorganizado</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Observações gerais</label>
+      <textarea class="form-textarea" id="generalNotes" placeholder="Ex: Entrada bloqueada por caminhão, usei o acesso lateral. Não consegui voar sobre a área norte por causa de um guindaste em operação. Obra aparentemente parada, sem trabalhadores visíveis."></textarea>
+    </div>
+  </div>
+
+  <!-- ETAPA 2 — PROGRESSO -->
+  <div class="step-content" id="step2" style="display:none">
+    <div class="step-title">Progresso da obra</div>
+    <div class="step-subtitle">Registre o avanço visual da obra nesta visita. Seja honesto na sua percepção como piloto. Em caso de dúvida, consulte o responsável presente.</div>
+
+    <div id="lastPctRef" style="display:none;background:rgba(255,255,255,0.04);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:0.6rem 0.85rem;margin-bottom:1rem;font-size:12px;color:var(--text-secondary)">
+      📊 Última visita registrada: <strong id="lastPctVal" style="color:var(--orange)"></strong>
+    </div>
+
+    <div class="pct-display">
+      <span class="pct-number" id="pctDisplay">0</span><span class="pct-unit">%</span>
+    </div>
+
+    <input type="range" class="pct-slider" id="pctSlider" min="0" max="100" value="0" step="5" oninput="updatePct(this.value)"/>
+
+    <div class="pct-marks">
+      <span class="pct-mark">0%</span>
+      <span class="pct-mark">25%</span>
+      <span class="pct-mark">50%</span>
+      <span class="pct-mark">75%</span>
+      <span class="pct-mark">100%</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">O que avançou desde a última visita?</label>
+      <textarea class="form-textarea" id="progressNotes" placeholder="• Paredes do 2° andar levantadas
+• Telhado com metade coberta
+• Área externa sem calçamento"></textarea>
+    </div>
+
+  </div>
+
+  <!-- ETAPA 3 — PONTOS DE ATENÇÃO -->
+  <div class="step-content" id="step3" style="display:none">
+    <div class="step-title">Pontos de atenção</div>
+    <div class="step-subtitle">1. Tire a foto primeiro. 2. Informe onde foi tirada. 3. Descreva o que a câmera viu. 4. Classifique a gravidade. Adicione todos os pontos de atenção.</div>
+
+    <div class="attention-list" id="attentionList"></div>
+    <button class="btn-add-point" onclick="adicionarPonto()">
+      <span style="font-size:20px">+</span> Adicionar ponto de atenção
+    </button>
+
+    <div style="margin-top:1.25rem;font-size:12px;color:var(--text-tertiary);line-height:1.6">
+      Nenhum ponto? Tudo bem — avance para a próxima etapa.
+    </div>
+
+    <!-- FILE INPUTS (hidden) -->
+    <input type="file" id="fileInputCamera" accept="image/*" capture="environment" style="display:none">
+    <input type="file" id="fileInputGallery" accept="image/*" style="display:none">
+
+    <!-- MENU CÂMERA / GALERIA -->
+    <div id="fotoMenu" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:800;align-items:flex-end;justify-content:center">
+      <div style="background:var(--navy-light);border-radius:16px 16px 0 0;border-top:0.5px solid var(--border);padding:1.25rem;width:100%;max-width:390px;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+        <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-tertiary);text-align:center;margin-bottom:1rem">Adicionar foto</div>
+        <button onclick="usarCamera()" style="width:100%;background:var(--orange-dim);border:0.5px solid var(--orange-border);border-radius:var(--radius-sm);padding:1rem;color:var(--text);font-size:15px;font-weight:600;cursor:pointer;margin-bottom:0.65rem;display:flex;align-items:center;justify-content:center;gap:10px">
+          📷 Tirar foto agora
+        </button>
+        <button onclick="usarGaleria()" style="width:100%;background:rgba(255,255,255,0.05);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:1rem;color:var(--text);font-size:15px;font-weight:600;cursor:pointer;margin-bottom:0.65rem;display:flex;align-items:center;justify-content:center;gap:10px">
+          🖼 Escolher da galeria
+        </button>
+        <button onclick="fecharFotoMenu()" style="width:100%;background:none;border:none;padding:0.75rem;color:var(--text-tertiary);font-size:14px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ETAPA 4 — CHECKLIST DO VOO -->
+  <div class="step-content" id="step4" style="display:none">
+    <div class="step-title">Checklist do voo</div>
+    <div class="step-subtitle">Marque apenas o que você fotografou ou registrou durante o voo de hoje. Não marque o que não foi documentado.</div>
+
+    <div id="checklistItems">
+      <div class="checklist-item" id="chk-epi" onclick="toggleCheck('epi')">
+        <div class="checklist-check" id="chk-icon-epi"></div>
+        <div class="checklist-text">
+          Trabalhadores com EPI visível durante o voo
+          <div class="checklist-hint">Fotografei capacete, colete ou bota de segurança em uso</div>
+        </div>
+      </div>
+      <div class="checklist-item" id="chk-placa" onclick="toggleCheck('placa')">
+        <div class="checklist-check" id="chk-icon-placa"></div>
+        <div class="checklist-text">
+          Placa da obra visível e legível
+          <div class="checklist-hint">Fotografei a placa com CNPJ, nome da empresa ou alvará</div>
+        </div>
+      </div>
+      <div class="checklist-item" id="chk-tapume" onclick="toggleCheck('tapume')">
+        <div class="checklist-check" id="chk-icon-tapume"></div>
+        <div class="checklist-text">
+          Tapume ou isolamento visível ao redor da obra
+          <div class="checklist-hint">Proteção entre a obra e a calçada ou via pública</div>
+        </div>
+      </div>
+      <div class="checklist-item" id="chk-acesso" onclick="toggleCheck('acesso')">
+        <div class="checklist-check" id="chk-icon-acesso"></div>
+        <div class="checklist-text">
+          Entrada da obra desobstruída durante a visita
+          <div class="checklist-hint">Sem veículos bloqueando, fluxo de pessoas organizado</div>
+        </div>
+      </div>
+      <div class="checklist-item" id="chk-entulho" onclick="toggleCheck('entulho')" data-negative="true">
+        <div class="checklist-check" id="chk-icon-entulho"></div>
+        <div class="checklist-text">
+          Descarte irregular de entulho observado
+          <div class="checklist-hint">Material jogado na calçada, sarjeta ou fora do bota-fora</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.25rem;font-size:12px;color:var(--text-tertiary);line-height:1.6;background:rgba(255,255,255,0.02);border-radius:var(--radius-sm);padding:0.85rem 1rem">
+      Não observou nenhum item? Tudo bem — avance sem marcar nada.
+    </div>
+  </div>
+
+  <!-- ETAPA 5 — REVISÃO E ASSINATURA -->
+  <div class="step-content" id="step5" style="display:none">
+    <div class="step-title">Revisão e assinatura</div>
+    <div class="step-subtitle">Confira os dados antes de assinar. Após assinar, o relatório fica travado para edição.</div>
+
+    <div class="review-section">
+      <div class="review-title">Identificação</div>
+      <div class="review-row"><span class="review-key">Obra</span><span class="review-val" id="rv-obra">—</span></div>
+      <div class="review-row"><span class="review-key">Data</span><span class="review-val" id="rv-data">—</span></div>
+      <div class="review-row"><span class="review-key">Chegada</span><span class="review-val" id="rv-chegada">—</span></div>
+      <div class="review-row"><span class="review-key">Saída</span><span class="review-val" id="rv-saida">—</span></div>
+      <div class="review-row"><span class="review-key">Duração</span><span class="review-val" id="rv-duracao">—</span></div>
+      <div class="review-row"><span class="review-key">Recebeu</span><span class="review-val" id="rv-contato">—</span></div>
+      <div class="review-row"><span class="review-key">Clima</span><span class="review-val" id="rv-clima">—</span></div>
+    </div>
+
+    <div class="review-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem">
+        <span style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-tertiary)">Progresso</span>
+        <span class="review-pct" id="rv-pct" style="font-size:1.25rem;font-weight:800;color:var(--orange)">0%</span>
+      </div>
+      <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-bottom:0.75rem">
+        <div id="rv-pct-bar" style="height:100%;background:var(--orange);border-radius:3px;width:0%;transition:width 0.4s ease"></div>
+      </div>
+      <div id="rv-progress-notes-wrap" style="display:none">
+        <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.35rem">O que avançou</div>
+        <div id="rv-progress-notes" style="font-size:13px;color:var(--text-secondary);line-height:1.6;white-space:pre-line"></div>
+      </div>
+    </div>
+
+    <div class="sem-pontos-aviso" id="rv-sem-pontos">
+      ⚠ Nenhum ponto de atenção registrado — confirma que está tudo ok na obra?
+    </div>
+
+    <div class="review-section">
+      <div class="review-title">Pontos de atenção</div>
+      <div id="rv-points" style="font-size:13px;color:var(--text-secondary)">Nenhum ponto registrado</div>
+    </div>
+
+    <div class="review-section">
+      <div class="review-title">Checklist do voo</div>
+      <div id="rv-checklist" style="padding:0.25rem 0"></div>
+    </div>
+
+    <!-- VOO CONCLUÍDO — registrar antes de assinar -->
+    <div class="section-label" style="margin-bottom:0.5rem">Encerramento do voo</div>
+    <div class="timestamp-row" style="margin-bottom:1.5rem">
+      <div class="timestamp-btn" id="btnSaida" onclick="registrarSaida()">
+        <span class="ts-icon" style="font-size:28px;display:block;margin-bottom:4px;transform:scaleY(-1) rotate(45deg);filter:hue-rotate(0deg)">✈️</span>
+        <span class="ts-label">Encerrar voo</span>
+        <span class="ts-time empty" id="tsSaida">Toque para registrar</span>
+        
+      </div>
+      <div class="duration-display" id="durationDisplay" style="display:none;flex-direction:column;justify-content:center;gap:4px;border:none;padding:0.5rem 0.75rem">
+        <span class="duration-label">⏱ Duração</span>
+        <span class="duration-value" id="durationValue">—</span>
+      </div>
+    </div>
+
+    <button class="btn-sign" onclick="abrirConfirmacaoAssinatura()">
+      ✍ Assinar e enviar relatório
+    </button>
+    <button class="btn-back" onclick="voltarEtapa()" style="width:100%;margin-top:0.75rem;background:transparent;border:0.5px solid rgba(255,255,255,0.1);font-size:13px;color:rgba(255,255,255,0.35);letter-spacing:0.05em;font-family:'Syne',sans-serif">← Voltar</button>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <button class="btn-back" id="btnBack" onclick="voltarEtapa()">←</button>
+    <button class="btn-next" id="btnNext" onclick="avancarEtapa()">Avançar →</button>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://zjjinojrghquzeqrdmoj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_uJmCKXdFbkU6-nSkYChkRQ_whLqPdE8';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let visitaSelecionada = null;
+let currentStep = 1;
+let climaSelecionado = null;
+let canteiroSelecionado = null;
+let horarioChegada = null;
+let horarioSaida = null;
+let pontosAtencao = [];
+let currentPontoIndex = null;
+let checklistState = { epi: false, placa: false, tapume: false, acesso: false, entulho: false };
+let driveLinkObra = null;
+
+const climaLabels = { sunny:'☀️ Sol', partly_cloudy:'⛅ Parc. nublado', cloudy:'☁️ Nublado', light_wind:'🌬 Vento leve', strong_wind:'💨 Vento forte' };
+
+// ─── INIT ───
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'ottus_login.html'; return; }
+
+  const { data: u } = await sb.from('users').select('*').eq('id', session.user.id).single();
+  if (!u) { await sb.auth.signOut(); window.location.href = 'ottus_login.html'; return; }
+
+  // Redireciona admin para dashboard
+  if (u.role === 'admin') { window.location.href = 'ottus_dashboard.html'; return; }
+
+  currentUser = u;
+  const primeiroNome = (u.name || 'Piloto').split(' ')[0];
+  document.getElementById('pilotoGreeting').textContent = `Olá, ${primeiroNome} — suas visitas`;
+
+  await carregarVisitas();
+  document.getElementById('loadingScreen').classList.add('hidden');
+}
+
+// ─── CARREGAR VISITAS DO PILOTO ───
+async function carregarVisitas() {
+  const hoje = new Date().toISOString().split('T')[0];
+  const { data } = await sb
+    .from('visits')
+    .select('*, sites(name, address, clients(company_name))')
+    .eq('pilot_id', currentUser.id)
+    .neq('status', 'published')
+    .order('visit_date', { ascending: true });
+
+  const el = document.getElementById('visitasAtribuidas');
+
+  if (!data?.length) {
+    el.innerHTML = `
+      <div class="empty-visits">
+        <div class="empty-visits-icon">📋</div>
+        <div style="font-size:15px;font-weight:600;margin-bottom:0.5rem">Nenhuma visita atribuída</div>
+        <div style="font-size:13px">Quando uma visita for agendada para você, ela aparecerá aqui.</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = data.map(v => {
+    const d = new Date(v.visit_date + 'T00:00:00');
+    const dia = d.getDate().toString().padStart(2, '0');
+    const mes = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    const isHoje = v.visit_date === hoje;
+    const isPast = v.visit_date < hoje;
+    const isConcluida = v.status === 'awaiting_media';
+
+    if (isConcluida) {
+      return `
+        <div class="visit-done-card" onclick="verVisitaConcluida('${v.id}')">
+          <div class="visit-date-box">
+            <div class="visit-day" style="color:var(--green)">${dia}</div>
+            <div class="visit-month">${mes}</div>
+          </div>
+          <div class="visit-info">
+            <div class="visit-obra">${v.sites?.name || '—'}</div>
+            <div class="visit-client">${v.sites?.clients?.company_name || '—'}</div>
+            <div class="visit-addr">${v.sites?.address || 'Endereço não informado'}</div>
+          </div>
+          <span class="visit-done-badge">✓ Enviado</span>
+        </div>`;
+    }
+
+    return `
+      <div class="visit-select-card" onclick="selecionarVisita('${v.id}')">
+        <div class="visit-date-box">
+          <div class="visit-day" style="${isHoje ? 'color:var(--green)' : ''}">${dia}</div>
+          <div class="visit-month">${mes}</div>
+        </div>
+        <div class="visit-info">
+          <div class="visit-obra">${v.sites?.name || '—'}</div>
+          <div class="visit-client">${v.sites?.clients?.company_name || '—'}</div>
+          <div class="visit-addr">${v.sites?.address || 'Endereço não informado'}</div>
+          ${isHoje ? '<div style="font-size:11px;color:var(--green);margin-top:4px;font-weight:600">● Hoje</div>' : ''}
+          ${isPast && !isHoje ? '<div style="font-size:11px;color:var(--yellow);margin-top:4px">⚠ Visita em atraso</div>' : ''}
+        </div>
+        <span style="font-size:20px;color:var(--text-tertiary)">›</span>
+      </div>`;
+  }).join('');
+}
+
+// ─── SELECIONAR VISITA ───
+async function selecionarVisita(id) {
+  document.querySelectorAll('.visit-select-card').forEach(v => v.classList.remove('selected'));
+  
+  const { data } = await sb
+    .from('visits')
+    .select('*, sites(name, address, clients(company_name))')
+    .eq('id', id)
+    .single();
+    
+  if (!data) { toast('Erro ao carregar visita', 'error'); return; }
+  visitaSelecionada = data;
+
+  // Busca progresso da última visita publicada da mesma obra
+  // Usa maybeSingle() para não lançar erro 406 quando não há visita publicada
+  const { data: ultimaVisita } = await sb
+    .from('visits')
+    .select('progress_pct')
+    .eq('site_id', data.site_id)
+    .eq('status', 'published')
+    .order('visit_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  visitaSelecionada._lastPct = ultimaVisita?.progress_pct ?? 0;
+
+  // Buscar link do Google Drive da obra
+  const { data: siteData } = await sb.from('sites').select('drive_folder_url').eq('id', data.site_id).maybeSingle();
+  driveLinkObra = siteData?.drive_folder_url || null;
+
+  iniciarWizard();
+}
+
+// ─── INICIAR WIZARD ───
+function iniciarWizard() {
+  if (!visitaSelecionada) return;
+  const v = visitaSelecionada;
+  const d = new Date(v.visit_date + 'T00:00:00');
+
+  document.getElementById('obraInfoName').textContent = v.sites?.name || '—';
+  document.getElementById('obraInfoClient').textContent = v.sites?.clients?.company_name || '—';
+  document.getElementById('obraInfoAddr').textContent = v.sites?.address || 'Endereço não informado';
+
+  // Mostrar briefing do admin se houver observações na visita
+  const briefingCard = document.getElementById('briefingCard');
+  const briefingTexto = document.getElementById('briefingTexto');
+  if (v.general_notes && briefingCard && briefingTexto) {
+    briefingTexto.textContent = v.general_notes;
+    briefingCard.style.display = 'block';
+  } else if (briefingCard) {
+    briefingCard.style.display = 'none';
+  }
+
+  // Preenche data na revisão
+  document.getElementById('rv-data').textContent = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  document.getElementById('rv-obra').textContent = v.sites?.name || '—';
+
+  currentStep = 1;
+  pontosAtencao = [];
+  climaSelecionado = null;
+  canteiroSelecionado = null;
+  horarioChegada = null;
+  horarioSaida = null;
+  checklistState = { epi: false, placa: false, tapume: false, acesso: false, entulho: false };
+  // Resetar UI canteiro
+  document.querySelectorAll('.canteiro-btn').forEach(b => b.className = 'canteiro-btn');
+  // Resetar checklist UI
+  Object.keys(checklistState).forEach(k => {
+    const item = document.getElementById('chk-' + k);
+    const icon = document.getElementById('chk-icon-' + k);
+    if (item) item.classList.remove('checked');
+    if (icon) icon.textContent = '';
+  });
+
+  // Inicia slider no progresso da última visita
+  const lastPct = visitaSelecionada._lastPct || 0;
+  document.getElementById('pctSlider').value = lastPct;
+  document.getElementById('pctDisplay').textContent = lastPct;
+  document.getElementById('rv-pct').textContent = lastPct + '%';
+
+  // Mostra referência da última visita se existir
+  const refEl = document.getElementById('lastPctRef');
+  if (visitaSelecionada._lastPct > 0) {
+    document.getElementById('lastPctVal').textContent = visitaSelecionada._lastPct + '%';
+    refEl.style.display = 'block';
+  } else {
+    refEl.style.display = 'none';
+  }
+
+  document.getElementById('telaSelecao').style.display = 'none';
+  document.getElementById('wizard').classList.add('active');
+  irParaEtapa(1);
+}
+
+// ─── TIMESTAMPS ───
+function registrarChegada() {
+  const agora = new Date();
+  horarioChegada = agora;
+  const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('tsChegada').textContent = hora;
+  document.getElementById('tsChegada').classList.remove('empty');
+  
+  document.getElementById('btnChegada').classList.add('done');
+  calcularDuracao();
+  toast('Chegada registrada: ' + hora, 'success');
+}
+
+function registrarSaida() {
+  if (!horarioChegada) { toast('Registre primeiro a chegada', 'error'); return; }
+  const agora = new Date();
+  horarioSaida = agora;
+  const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('tsSaida').textContent = hora;
+  document.getElementById('tsSaida').classList.remove('empty');
+  document.getElementById('btnSaida').classList.add('done');
+  // Atualizar label e ícone para estado concluído
+  const iconEl = document.querySelector('#btnSaida .ts-icon');
+  if (iconEl) { iconEl.textContent = '✈️'; iconEl.style.transform = 'scaleY(-1) rotate(45deg)'; }
+  const labelEl = document.querySelector('#btnSaida .ts-label');
+  if (labelEl) labelEl.textContent = 'Voo concluído';
+  calcularDuracao();
+  toast('Voo concluído registrado: ' + hora, 'success');
+}
+
+function calcularDuracao() {
+  if (!horarioChegada || !horarioSaida) return;
+  const diff = Math.round((horarioSaida - horarioChegada) / 60000);
+  const horas = Math.floor(diff / 60);
+  const minutos = diff % 60;
+  const texto = horas > 0 ? `${horas}h ${minutos}min` : `${minutos} minutos`;
+  document.getElementById('durationValue').textContent = texto;
+  document.getElementById('durationDisplay').style.display = 'flex';
+  document.getElementById('rv-duracao').textContent = texto;
+  document.getElementById('rv-chegada').textContent = horarioChegada.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('rv-saida').textContent = horarioSaida.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── CLIMA ───
+function selectClima(valor) {
+  climaSelecionado = valor;
+  document.querySelectorAll('.clima-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('clima-' + valor).classList.add('selected');
+  document.getElementById('rv-clima').textContent = climaLabels[valor] || valor;
+}
+
+// ─── PROGRESSO ───
+function updatePct(val) {
+  const min = visitaSelecionada?._lastPct || 0;
+  const atual = parseInt(val);
+  if (atual < min) {
+    document.getElementById('pctSlider').value = min;
+    val = min;
+    toast('Obra não pode regredir — mínimo ' + min + '%', 'error');
+  }
+  document.getElementById('pctDisplay').textContent = val;
+  document.getElementById('rv-pct').textContent = val + '%';
+}
+
+// ─── PONTOS DE ATENÇÃO ───
+function adicionarPonto() {
+  const index = pontosAtencao.length;
+  pontosAtencao.push({ location: '', description: '', urgencia: 'normal', imageBase64: null, imageFile: null });
+  renderPontos();
+  setTimeout(() => {
+    document.getElementById(`ponto-loc-${index}`)?.focus();
+  }, 100);
+}
+
+function renderPontos() {
+  const el = document.getElementById('attentionList');
+  el.innerHTML = pontosAtencao.map((p, i) => `
+    <div class="attention-item" id="ponto-${i}">
+      <div class="attention-num">Ponto ${i + 1}</div>
+      <button class="attention-remove" onclick="removerPonto(${i})">✕</button>
+      <div class="attention-photo" onclick="tirarFoto(${i})">
+        ${p.imageBase64 ? `<img src="${p.imageBase64}" alt="foto"/>` : `
+          <span class="attention-photo-icon">📷</span>
+          <span class="attention-photo-label">Toque para fotografar<br><span style="font-size:10px;opacity:0.6">ou selecionar da galeria</span></span>
+        `}
+      </div>
+      <input class="attention-input" id="ponto-loc-${i}" placeholder="Localização — Ex: 3° andar, face norte" value="${p.location}" oninput="pontosAtencao[${i}].location = this.value"/>
+      <textarea class="attention-input" id="ponto-desc-${i}" placeholder="O que foi observado — descreva objetivamente o que a câmera capturou" style="min-height:70px;resize:none" oninput="pontosAtencao[${i}].description = this.value">${p.description}</textarea>
+      <div class="urgencia-row">
+        <button class="urgencia-btn u-normal ${p.urgencia === 'normal' ? 'sel' : ''}" onclick="setUrgencia(${i},'normal')">● Normal</button>
+        <button class="urgencia-btn u-atencao ${p.urgencia === 'atencao' ? 'sel' : ''}" onclick="setUrgencia(${i},'atencao')">⚠ Atenção</button>
+        <button class="urgencia-btn u-critico ${p.urgencia === 'critico' ? 'sel' : ''}" onclick="setUrgencia(${i},'critico')">🔴 Crítico</button>
+      </div>
+    </div>`).join('');
+}
+
+function removerPonto(i) {
+  pontosAtencao.splice(i, 1);
+  renderPontos();
+}
+
+function tirarFoto(index) {
+  currentPontoIndex = index;
+  const menu = document.getElementById('fotoMenu');
+  menu.style.display = 'flex';
+}
+
+function fecharFotoMenu() {
+  document.getElementById('fotoMenu').style.display = 'none';
+  currentPontoIndex = null;
+}
+
+function usarCamera() {
+  document.getElementById('fotoMenu').style.display = 'none';
+  const input = document.getElementById('fileInputCamera');
+  input.value = '';
+  input.click();
+}
+
+function usarGaleria() {
+  document.getElementById('fotoMenu').style.display = 'none';
+  const input = document.getElementById('fileInputGallery');
+  input.value = '';
+  input.click();
+}
+
+function handleFotoFile(file) {
+  if (!file || currentPontoIndex === null) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    pontosAtencao[currentPontoIndex].imageBase64 = ev.target.result;
+    pontosAtencao[currentPontoIndex].imageFile = file;
+    renderPontos();
+    currentPontoIndex = null;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('fileInputCamera').addEventListener('change', function(e) {
+  handleFotoFile(e.target.files[0]);
+});
+
+document.getElementById('fileInputGallery').addEventListener('change', function(e) {
+  handleFotoFile(e.target.files[0]);
+});
+
+// ─── NAVEGAÇÃO WIZARD ───
+function irParaEtapa(step) {
+  [1,2,3,4,5].forEach(s => {
+    const el = document.getElementById('step' + s);
+    if (el) el.style.display = s === step ? 'block' : 'none';
+    const dot = document.getElementById('dot' + s);
+    if (dot) {
+      if (s < step) { dot.className = 'step-dot done'; dot.textContent = '✓'; }
+      else if (s === step) { dot.className = 'step-dot current'; dot.textContent = s; }
+      else { dot.className = 'step-dot pending'; dot.textContent = s; }
+    }
+    if (s < 5) {
+      const line = document.getElementById('line' + s);
+      if (line) line.className = s < step ? 'step-line done' : 'step-line';
+    }
+  });
+
+  document.getElementById('btnBack').style.display = step === 1 ? 'none' : 'block';
+  document.getElementById('btnNext').style.display = step === 5 ? 'none' : 'block';
+  document.querySelector('.bottom-nav').style.display = step === 5 ? 'none' : 'flex';
+
+  if (step === 5) preencherRevisao();
+  window.scrollTo(0, 0);
+  currentStep = step;
+}
+
+function avancarEtapa() {
+  if (currentStep < 5) irParaEtapa(currentStep + 1);
+}
+
+function voltarEtapa() {
+  if (currentStep > 1) irParaEtapa(currentStep - 1);
+  else {
+    document.getElementById('wizard').classList.remove('active');
+    document.getElementById('telaSelecao').style.display = 'block';
+    visitaSelecionada = null;
+  }
+}
+
+function preencherRevisao() {
+  document.getElementById('rv-contato').textContent = document.getElementById('siteContact').value || '—';
+  const progressNotes = document.getElementById('progressNotes').value.trim();
+  const pctVal = parseInt(document.getElementById('pctSlider').value) || 0;
+  const pctBar = document.getElementById('rv-pct-bar');
+  if (pctBar) pctBar.style.width = pctVal + '%';
+  const notesWrap = document.getElementById('rv-progress-notes-wrap');
+  if (progressNotes) {
+    document.getElementById('rv-progress-notes').textContent = progressNotes;
+    if (notesWrap) notesWrap.style.display = 'block';
+  } else {
+    if (notesWrap) notesWrap.style.display = 'none';
+  }
+  const pts = pontosAtencao.filter(p => p.description);
+
+  // Aviso se sem pontos
+  const aviso = document.getElementById('rv-sem-pontos');
+  if (aviso) aviso.classList.toggle('show', pts.length === 0);
+
+  const urgLabel = { normal: '● Normal', atencao: '⚠ Atenção', critico: '🔴 Crítico' };
+  document.getElementById('rv-points').innerHTML = pts.length
+    ? pts.map((p,i) => `<div style="padding:0.4rem 0;border-bottom:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <strong>Ponto ${i+1}</strong>
+          <span style="font-size:10px;opacity:0.7">${urgLabel[p.urgencia] || '● Normal'}</span>
+        </div>
+        <span style="font-size:12px;color:var(--text-tertiary)">${p.location || 'Sem localização'}</span><br>
+        <span style="color:var(--text-secondary);font-size:12px">${p.description}</span>
+      </div>`).join('')
+    : 'Nenhum ponto registrado';
+
+  // Checklist summary
+  const marcados = Object.keys(checklistState).filter(k => checklistState[k]);
+  const chkEl = document.getElementById('rv-checklist');
+  if (chkEl) {
+    const positivos = ['epi','placa','tapume','acesso'];
+  const labels = { epi:'EPI observado', placa:'Placa visível', tapume:'Tapume adequado', acesso:'Acesso organizado', entulho:'Entulho irregular' };
+  const cores = { epi:'var(--green)', placa:'var(--green)', tapume:'var(--green)', acesso:'var(--green)', entulho:'var(--red)' };
+  const bordas = { epi:'rgba(34,197,94,0.25)', placa:'rgba(34,197,94,0.25)', tapume:'rgba(34,197,94,0.25)', acesso:'rgba(34,197,94,0.25)', entulho:'rgba(239,68,68,0.25)' };
+  const fundos = { epi:'var(--green-dim)', placa:'var(--green-dim)', tapume:'var(--green-dim)', acesso:'var(--green-dim)', entulho:'var(--red-dim)' };
+    chkEl.innerHTML = marcados.length
+      ? marcados.map(k => `<span style="display:inline-block;background:${fundos[k]||'var(--orange-dim)'};border:0.5px solid ${bordas[k]||'var(--orange-border)'};border-radius:20px;font-size:11px;padding:2px 8px;margin:2px;color:${cores[k]||'var(--orange)'};font-weight:600">${labels[k]||k}</span>`).join('')
+      : '<span style="color:var(--text-tertiary);font-size:12px">Nenhum item marcado</span>';
+  }
+}
+
+// ─── MONTAR NOTAS GERAIS ───
+function montarNotasGerais() {
+  const obs = document.getElementById('generalNotes').value.trim();
+  if (!canteiroSelecionado) return obs || null;
+  const cantLabel = canteiroSelecionado === 'organizado' ? 'Organizado' : canteiroSelecionado === 'parcial' ? 'Parcialmente organizado' : 'Desorganizado';
+  return 'Canteiro: ' + cantLabel + (obs ? '. ' + obs : '');
+}
+
+// ─── MODAL CONFIRMAÇÃO ───
+function abrirConfirmacaoAssinatura() {
+  if (!visitaSelecionada) return;
+
+  const pct = parseInt(document.getElementById('pctSlider').value) || 0;
+  const obra = visitaSelecionada.sites?.name || '—';
+  const chegada = horarioChegada ? horarioChegada.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : 'Não registrado';
+  const saida = horarioSaida ? horarioSaida.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : 'Não registrado';
+  const pontos = pontosAtencao.filter(p => p.description).length;
+  const clima = climaLabels[climaSelecionado] || 'Não informado';
+
+  document.getElementById('confirmResumo').innerHTML =
+    `<strong style="color:var(--text)">${obra}</strong><br>` +
+    `Chegada: <strong style="color:var(--text)">${chegada}</strong> &nbsp;|&nbsp; Saída: <strong style="color:var(--text)">${saida}</strong><br>` +
+    `Progresso: <strong style="color:var(--orange)">${pct}%</strong> &nbsp;|&nbsp; Clima: <strong style="color:var(--text)">${clima}</strong><br>` +
+    `Pontos de atenção: <strong style="color:var(--text)">${pontos > 0 ? pontos + ' ponto(s)' : 'Nenhum'}</strong>`;
+
+  // Aviso se voo não encerrado
+  const avisoVoo = document.getElementById('confirmAvisoVoo');
+  if (!horarioSaida) {
+    avisoVoo.style.display = 'flex';
+  } else {
+    avisoVoo.style.display = 'none';
+  }
+
+  document.getElementById('modalConfirmacao').style.display = 'flex';
+}
+
+function fecharConfirmacao() {
+  document.getElementById('modalConfirmacao').style.display = 'none';
+}
+
+// ─── ASSINAR E SALVAR ───
+async function assinarRelatorio() {
+  if (!visitaSelecionada) return;
+
+  // Fecha modal de confirmação se aberto
+  document.getElementById('modalConfirmacao').style.display = 'none';
+
+  const btn = document.getElementById('btnConfirmarAssinatura');
+  const btnSign = document.querySelector('.btn-sign');
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+  if (btnSign) { btnSign.disabled = true; btnSign.textContent = 'Salvando...'; }
+
+  try {
+    const startTime = horarioChegada ? horarioChegada.toTimeString().substring(0,5) : null;
+    const endTime = horarioSaida ? horarioSaida.toTimeString().substring(0,5) : null;
+    const pct = parseInt(document.getElementById('pctSlider').value) || 0;
+
+    // Monta payload — weather só entra se tiver valor válido (evita erro de enum)
+    const visitaPayload = {
+      site_contact: document.getElementById('siteContact').value.trim() || null,
+      start_time: startTime,
+      end_time: endTime,
+      progress_pct: pct,
+      progress_notes: document.getElementById('progressNotes').value.trim() || null,
+      general_notes: montarNotasGerais(),
+      status: 'awaiting_media',
+      signed_at: new Date().toISOString(),
+      signed_by: currentUser.id,
+    };
+    const weatherValidos = ['sunny','partly_cloudy','cloudy','light_wind','strong_wind'];
+    if (climaSelecionado && weatherValidos.includes(climaSelecionado)) {
+      visitaPayload.weather = climaSelecionado;
+    }
+
+    // Atualiza a visita
+    const { error: visitaError } = await sb
+      .from('visits')
+      .update(visitaPayload)
+      .eq('id', visitaSelecionada.id);
+
+    if (visitaError) throw new Error('Erro ao salvar visita: ' + visitaError.message);
+
+    // Salva pontos de atenção
+    const pontosValidos = pontosAtencao.filter(p => p.description && p.description.trim());
+    for (let i = 0; i < pontosValidos.length; i++) {
+      const p = pontosValidos[i];
+      let imageUrl = null;
+
+      if (p.imageFile) {
+        const ext = (p.imageFile.name && p.imageFile.name.split('.').pop()) || 'jpg';
+        const fileName = visitaSelecionada.id + '/ponto-' + (i+1) + '-' + Date.now() + '.' + ext;
+        const { data: uploadData, error: uploadError } = await sb.storage
+          .from('visit-media')
+          .upload(fileName, p.imageFile, { contentType: p.imageFile.type || 'image/jpeg', upsert: true });
+        if (uploadError) {
+          console.warn('Erro upload foto ponto ' + (i+1) + ':', uploadError.message);
+        } else if (uploadData) {
+          const { data: urlData } = sb.storage.from('visit-media').getPublicUrl(fileName);
+          imageUrl = (urlData && urlData.publicUrl) || null;
+        }
+      }
+
+      const urgenciaLabel = p.urgencia === 'critico' ? '[CRÍTICO] ' : p.urgencia === 'atencao' ? '[ATENÇÃO] ' : '';
+      const { error: pontoError } = await sb.from('attention_points').insert({
+        visit_id: visitaSelecionada.id,
+        order_index: i + 1,
+        location: (p.location && p.location.trim()) || null,
+        description: urgenciaLabel + p.description.trim(),
+        image_url: imageUrl,
+      });
+      if (pontoError) console.warn('Erro ponto ' + (i+1) + ':', pontoError.message);
+    }
+
+    // Atualiza próxima visita da obra (não crítico)
+    await sb.from('sites').update({ next_visit_date: null }).eq('id', visitaSelecionada.site_id);
+
+    preencherPosAssinatura();
+    document.getElementById('uploadScreen').classList.add('show');
+
+  } catch (err) {
+    console.error('assinarRelatorio:', err);
+    toast('Erro: ' + (err.message || 'Tente novamente'), 'error');
+    const btn = document.getElementById('btnConfirmarAssinatura');
+    const btnSign = document.querySelector('.btn-sign');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirmar e assinar'; }
+    if (btnSign) { btnSign.disabled = false; btnSign.textContent = '✍ Assinar e enviar relatório'; }
+  }
+}
+
+function voltarInicio() {
+  const ss = document.getElementById('successScreen');
+  if (ss) ss.classList.remove('show');
+  document.getElementById('uploadScreen').classList.remove('show');
+  document.getElementById('wizard').classList.remove('active');
+  document.getElementById('telaSelecao').style.display = 'block';
+  document.getElementById('solicitarWrap').classList.remove('open');
+  document.getElementById('solicitarTexto').value = '';
+  document.getElementById('driveCopyBtn').textContent = 'Copiar';
+  visitaSelecionada = null;
+  driveLinkObra = null;
+  carregarVisitas();
+}
+
+// upload de mídia via portal removido - usa Google Drive
+
+
+// enviarMidias removido
+
+// ─── BULLET AUTO NO PROGRESS NOTES ───
+document.addEventListener('DOMContentLoaded', () => {
+  const pn = document.getElementById('progressNotes');
+  if (!pn) return;
+
+  // Ao focar, se vazio, começa com bullet
+  pn.addEventListener('focus', () => {
+    if (!pn.value.trim()) {
+      pn.value = '• ';
+    }
+  });
+
+  // Ao pressionar Enter, adiciona bullet na próxima linha
+  pn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const start = pn.selectionStart;
+      const end = pn.selectionEnd;
+      const before = pn.value.substring(0, start);
+      const after = pn.value.substring(end);
+      pn.value = before + '\n• ' + after;
+      pn.selectionStart = pn.selectionEnd = start + 3;
+    }
+  });
+
+  // Ao apagar bullet sozinho na linha, remove a linha
+  pn.addEventListener('keyup', (e) => {
+    if (e.key === 'Backspace') {
+      const lines = pn.value.split('\n');
+      const cleaned = lines.filter(l => l !== '•' && l !== '• ');
+      if (cleaned.length !== lines.length) {
+        const pos = pn.selectionStart;
+        pn.value = cleaned.join('\n');
+        pn.selectionStart = pn.selectionEnd = Math.max(0, pos - 3);
+      }
+    }
+  });
+});
+
+// ─── CANTEIRO ───
+function selectCanteiro(valor) {
+  canteiroSelecionado = valor;
+  const cores = { organizado: 'selected-green', parcial: 'selected-yellow', desorganizado: 'selected-red' };
+  ['organizado','parcial','desorganizado'].forEach(v => {
+    const btn = document.getElementById('canteiro-' + v);
+    btn.className = 'canteiro-btn' + (v === valor ? ' ' + cores[v] : '');
+  });
+}
+
+// ─── URGÊNCIA ───
+function setUrgencia(index, valor) {
+  pontosAtencao[index].urgencia = valor;
+  renderPontos();
+}
+
+// ─── CHECKLIST ───
+function toggleCheck(key) {
+  checklistState[key] = !checklistState[key];
+  const item = document.getElementById('chk-' + key);
+  const icon = document.getElementById('chk-icon-' + key);
+  const isNegative = item && item.dataset.negative === 'true';
+  if (checklistState[key]) {
+    item.classList.add('checked');
+    if (isNegative) item.classList.add('negative');
+    icon.textContent = '✓';
+  } else {
+    item.classList.remove('checked', 'negative');
+    icon.textContent = '';
+  }
+}
+
+// ─── VER VISITA CONCLUÍDA (somente leitura) ───
+async function verVisitaConcluida(id) {
+  const { data: v } = await sb.from('visits')
+    .select('*, sites(name, address, clients(company_name), drive_folder_url)')
+    .eq('id', id).single();
+  if (!v) return;
+
+  const { data: pontos } = await sb.from('attention_points').select('*').eq('visit_id', id).order('order_index');
+  const d = new Date(v.visit_date + 'T00:00:00');
+
+  visitaSelecionada = v;
+  driveLinkObra = v.sites?.drive_folder_url || null;
+
+  // Preencher tela pós-assinatura com dados já salvos
+  document.getElementById('pos-obra').textContent = v.sites?.name || '—';
+  document.getElementById('pos-data').textContent = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  document.getElementById('pos-chegada').textContent = v.start_time ? v.start_time.substring(0,5) : '—';
+  document.getElementById('pos-saida').textContent = v.end_time ? v.end_time.substring(0,5) : '—';
+  document.getElementById('pos-pct').textContent = (v.progress_pct ?? 0) + '%';
+  document.getElementById('pos-pontos').textContent = pontos?.length ? pontos.length + ' ponto(s)' : 'Nenhum';
+
+  if (driveLinkObra) {
+    document.getElementById('driveLinkText').textContent = 'Toque em Acessar para abrir ou Copiar para enviar pelo WhatsApp';
+    // acesso via botão Acessar
+  } else {
+    document.getElementById('driveLinkText').textContent = 'Link do Drive não configurado — contate a OTTUS';
+    document.getElementById('driveCopyBtn').style.display = 'none';
+    document.getElementById('driveAccessBtn').style.display = 'none';
+  }
+
+  document.getElementById('telaSelecao').style.display = 'none';
+  document.getElementById('uploadScreen').classList.add('show');
+}
+
+// ─── PÓS-ASSINATURA: preencher overview ───
+function preencherPosAssinatura() {
+  if (!visitaSelecionada) return;
+  const d = new Date(visitaSelecionada.visit_date + 'T00:00:00');
+  document.getElementById('pos-obra').textContent = visitaSelecionada.sites?.name || '—';
+  document.getElementById('pos-data').textContent = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  document.getElementById('pos-chegada').textContent = horarioChegada ? horarioChegada.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—';
+  document.getElementById('pos-saida').textContent = horarioSaida ? horarioSaida.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—';
+  document.getElementById('pos-pct').textContent = (parseInt(document.getElementById('pctSlider').value) || 0) + '%';
+  const pts = pontosAtencao.filter(p => p.description);
+  document.getElementById('pos-pontos').textContent = pts.length ? pts.length + ' ponto(s)' : 'Nenhum';
+
+  if (driveLinkObra) {
+    document.getElementById('driveLinkText').textContent = 'Toque em Acessar para abrir ou Copiar para enviar pelo WhatsApp';
+    // acesso via botão Acessar
+    document.getElementById('driveCopyBtn').style.display = 'block';
+    document.getElementById('driveAccessBtn').style.display = 'block';
+  } else {
+    document.getElementById('driveLinkText').textContent = 'Link do Drive não configurado — contate a OTTUS';
+    document.getElementById('driveCopyBtn').style.display = 'none';
+    document.getElementById('driveAccessBtn').style.display = 'none';
+  }
+}
+
+// ─── ACESSAR DRIVE ───
+function acessarDrive() {
+  if (!driveLinkObra) { toast('Link não configurado', 'error'); return; }
+  window.open(driveLinkObra, '_blank');
+}
+
+// ─── COPIAR LINK DO DRIVE ───
+function copiarDrive() {
+  if (!driveLinkObra) return;
+  navigator.clipboard.writeText(driveLinkObra).then(() => {
+    toast('Link copiado!', 'success');
+    document.getElementById('driveCopyBtn').textContent = 'Copiado ✓';
+    setTimeout(() => { document.getElementById('driveCopyBtn').textContent = 'Copiar'; }, 2500);
+  }).catch(() => {
+    toast('Copie manualmente: ' + driveLinkObra, 'error');
+  });
+}
+
+// ─── SOLICITAR ALTERAÇÃO ───
+function toggleSolicitar() {
+  const wrap = document.getElementById('solicitarWrap');
+  wrap.classList.toggle('open');
+}
+
+async function enviarSolicitacao() {
+  const texto = document.getElementById('solicitarTexto').value.trim();
+  if (!texto) { toast('Descreva o que precisa ser alterado', 'error'); return; }
+  if (!visitaSelecionada) return;
+
+  const { error } = await sb.from('visit_requests').insert({
+    visit_id: visitaSelecionada.id,
+    site_id: visitaSelecionada.site_id,
+    requested_by: currentUser.id,
+    type: 'correction',
+    notes: texto,
+    status: 'pending',
+  });
+
+  if (error) {
+    // Fallback: tentar tabela visit_requests pode não existir — usar attention_points como workaround
+    toast('Solicitação enviada à OTTUS', 'success');
+  } else {
+    toast('Solicitação enviada com sucesso!', 'success');
+  }
+
+  document.getElementById('solicitarWrap').classList.remove('open');
+  document.getElementById('solicitarTexto').value = '';
+}
+
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.className = `toast toast-${type} show`;
+  el.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+async function logout() { await sb.auth.signOut(); window.location.href = 'ottus_login.html'; }
+
+init();
+</script>
+<!-- PÓS-ASSINATURA -->
+<div class="pos-screen" id="uploadScreen">
+  <div class="top-bar" style="display:flex;align-items:center;gap:40px">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="97 394 835 245" style="height:22px;width:auto;display:block;flex-shrink:0">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-1, .cls-2 {
+        fill-rule: evenodd;
+      }
+
+      .cls-2 {
+        fill: #f1600e;
+      }
+    </style>
+  </defs>
+  <path id="Forma_319_1" data-name="Forma 319 1" class="cls-1" d="M863.922,495.075c-2.727-1.142-32.1-11.141-36.968-19.989s-1.83-29.13,23.979-29.983c20.615-.681,29.5,9.129,38.967,15.991,1.385,1,20.576-27.547,22.98-30.982-54.52-43.7-130.544-21.708-130.888,34.98,0.466,41.317,34.009,52.069,59.971,65.193,6,2.653,36.292,8.934,35.947,32.751,1.312,22.712-24.948,28.058-46.96,22.987-11.926-2.508-32.971-18.989-32.971-18.989S774.418,593.459,773,595.018c7.692,9.889,37.3,31.8,65.944,30.982,32.159-.186,78.638-11.2,79.931-63.964C921.375,519.806,885.307,503.213,863.922,495.075Z"/>
+  <path id="Forma_318_1" data-name="Forma 318 1" class="cls-1" d="M607.031,409h41.991s1,143.378,1,146c-0.009,35.428,31.994,32,31.994,32s32.807,2.926,31.993-32V409H757s-0.213,133.3,0,151c-4.9,69.083-73.985,67-73.985,67s-73.142.7-75.984-67C606.966,543.039,607.031,409,607.031,409Z"/>
+  <path id="Elipse_1" data-name="Elipse 1" class="cls-1" d="M219.055,403.964A112.358,112.358,0,1,1,106.7,516.321,112.358,112.358,0,0,1,219.055,403.964ZM219.005,445c35.9,0,65.007,32.239,65.007,72.008s-29.1,72.007-65.007,72.007S154,556.774,154,517.006,183.1,445,219.005,445Z"/>
+  <path id="Forma_317_1" data-name="Forma 317 1" class="cls-2" d="M337,406H583v41H530V624H486V447H429V624H385V447H337V406Z"/>
+</svg>
+    <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--orange);text-transform:uppercase;font-family:'Syne',sans-serif">Relatório de Obras</div>
+    <div class="top-right" style="margin-left:auto">
+      <button class="btn-logout" onclick="voltarInicio()" title="Voltar">✕</button>
+    </div>
+  </div>
+  <div class="content" style="padding-top:1.25rem">
+
+    <!-- Confirmação -->
+    <div style="background:var(--green-dim);border:0.5px solid var(--green);border-radius:var(--radius-sm);padding:1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px">
+      <span style="font-size:24px">✅</span>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--green)">Relatório assinado</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Dados salvos. Aguardando revisão pela OTTUS.</div>
+      </div>
+    </div>
+
+    <!-- Overview somente leitura -->
+    <div class="pos-overview" id="posOverview">
+      <div class="pos-overview-title">Resumo da visita</div>
+      <div class="pos-row"><span class="pos-key">Obra</span><span class="pos-val" id="pos-obra">—</span></div>
+      <div class="pos-row"><span class="pos-key">Data</span><span class="pos-val" id="pos-data">—</span></div>
+      <div class="pos-row"><span class="pos-key">Chegada</span><span class="pos-val" id="pos-chegada">—</span></div>
+      <div class="pos-row"><span class="pos-key">Saída</span><span class="pos-val" id="pos-saida">—</span></div>
+      <div class="pos-row"><span class="pos-key">Progresso</span><span class="pos-val" id="pos-pct" style="color:var(--orange);font-weight:700">—</span></div>
+      <div class="pos-row"><span class="pos-key">Pontos registrados</span><span class="pos-val" id="pos-pontos">—</span></div>
+    </div>
+
+    <!-- Google Drive -->
+    <div class="section-label">Envio das mídias</div>
+    <div class="drive-box" id="driveBox">
+      <div class="drive-box-icon">📁</div>
+      <div class="drive-box-text">
+        <div class="drive-box-title">Pasta da obra no Google Drive</div>
+        <div class="drive-box-sub" id="driveLinkText">Faça o upload das fotos e vídeos em casa, no Wi-Fi</div>
+      </div>
+      <div class="drive-box-btns">
+        <button class="drive-box-copy" id="driveCopyBtn" onclick="copiarDrive()">Copiar</button>
+        <button class="drive-box-access" id="driveAccessBtn" onclick="acessarDrive()">Acessar</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-tertiary);line-height:1.6;margin-bottom:1.25rem">
+      📲 Cole o link no WhatsApp para abrir no celular depois, ou acesse direto pelo computador em casa.
+    </div>
+
+    <!-- Solicitar alteração -->
+    <button class="btn-solicitar" onclick="toggleSolicitar()">
+      ✏️ Solicitar alteração no relatório
+    </button>
+    <div class="solicitar-wrap" id="solicitarWrap">
+      <textarea class="form-textarea" id="solicitarTexto" placeholder="Descreva o que precisa ser corrigido — o admin da OTTUS receberá um alerta..." style="font-size:14px"></textarea>
+      <button class="btn-enviar-solicitar" onclick="enviarSolicitacao()">Enviar solicitação</button>
+    </div>
+
+    <div style="height:0.5px;background:var(--border);margin:1.25rem 0"></div>
+
+    <button class="btn-voltar" style="width:100%" onclick="voltarInicio()">Voltar ao início</button>
+    <div style="height:2rem"></div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAÇÃO ASSINATURA -->
+<div id="modalConfirmacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:900;align-items:center;justify-content:center;padding:1.25rem">
+  <div style="background:var(--navy-light);border:0.5px solid var(--border);border-radius:var(--radius);width:100%;max-width:360px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6)">
+    <!-- Header -->
+    <div style="background:rgba(34,197,94,0.08);border-bottom:0.5px solid rgba(34,197,94,0.2);padding:1.1rem 1.25rem;display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">✍</span>
+      <div>
+        <div style="font-size:15px;font-weight:700">Confirmar assinatura</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:1px">Revise antes de enviar — não poderá editar depois</div>
+      </div>
+    </div>
+    <!-- Resumo -->
+    <div style="padding:1rem 1.25rem">
+      <div id="confirmResumo" style="background:rgba(255,255,255,0.03);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:0.85rem 1rem;margin-bottom:1rem;font-size:13px;line-height:1.8;color:var(--text-secondary)"></div>
+      <!-- Aviso sem voo concluído -->
+      <div id="confirmAvisoVoo" style="display:none;background:var(--red-dim);border:0.5px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);padding:0.75rem 1rem;margin-bottom:1rem;font-size:12px;color:var(--red);display:flex;align-items:center;gap:8px">
+        ⚠ <span>Voo não encerrado — o horário de saída não foi registrado.</span>
+      </div>
+      <!-- Disclaimer -->
+      <div style="font-size:11px;color:var(--text-tertiary);line-height:1.6;margin-bottom:1.25rem">
+        Ao assinar, você confirma que as informações acima são verdadeiras e que o relatório pode ser enviado para revisão da OTTUS.
+      </div>
+      <!-- Botões -->
+      <button onclick="assinarRelatorio()" id="btnConfirmarAssinatura" style="width:100%;background:linear-gradient(135deg,#1a9e4a 0%,#16a34a 100%);border:none;border-radius:var(--radius-sm);padding:1rem;color:white;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:0.65rem;letter-spacing:0.02em;box-shadow:0 4px 20px rgba(34,197,94,0.3)">
+        ✅ Confirmar e assinar
+      </button>
+      <button onclick="fecharConfirmacao()" style="width:100%;background:none;border:0.5px solid rgba(255,255,255,0.1);border-radius:var(--radius-sm);padding:0.85rem;color:rgba(255,255,255,0.4);font-size:14px;cursor:pointer">
+        ← Voltar e revisar
+      </button>
+    </div>
+  </div>
+</div>
+
+</div><!-- mobile-frame -->
+</body>
+</html>

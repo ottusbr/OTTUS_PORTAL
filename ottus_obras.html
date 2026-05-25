@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTTUS Portal — Obras</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #091c2b;
+    --navy-light: #0d2438;
+    --navy-card: #0f2a3d;
+    --orange: #d85a30;
+    --orange-hover: #c04e28;
+    --orange-dim: rgba(216,90,48,0.12);
+    --orange-border: rgba(216,90,48,0.25);
+    --text: #ffffff;
+    --text-secondary: rgba(255,255,255,0.5);
+    --text-tertiary: rgba(255,255,255,0.3);
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.12);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --sidebar-w: 220px;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: var(--navy); color: var(--text); min-height: 100vh; font-size: 14px; }
+  .layout { display: flex; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar-w); background: var(--navy-light); border-right: 0.5px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: transform 0.25s; }
+  .sidebar-logo { padding: 1.25rem 1rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .logo-tt svg { width: 28px; height: 28px; }
+  .logo-name { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; }
+  .logo-sub { font-size: 9px; color: var(--orange); letter-spacing: 0.12em; text-transform: uppercase; }
+  .sidebar-section { padding: 0.75rem 0.75rem 0.25rem; font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 0.6rem 0.75rem; margin: 1px 0.5rem; border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; transition: background 0.15s, color 0.15s; font-size: 13px; border: none; background: none; width: calc(100% - 1rem); text-align: left; }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-item.active { background: var(--orange-dim); color: var(--orange); }
+  .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+  .sidebar-bottom { margin-top: auto; padding: 0.75rem; border-top: 0.5px solid var(--border); }
+  .user-row { display: flex; align-items: center; gap: 10px; padding: 0.5rem; border-radius: var(--radius-sm); }
+  .user-avatar { width: 30px; height: 30px; background: var(--orange-dim); border: 0.5px solid var(--orange-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--orange); }
+  .user-name { font-size: 12px; font-weight: 500; }
+  .user-role { font-size: 10px; color: var(--text-secondary); }
+  .logout-btn { margin-left: auto; background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 16px; padding: 4px; transition: color 0.15s; }
+  .logout-btn:hover { color: var(--red); }
+
+  /* MAIN */
+  .main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+  .header { height: 56px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; padding: 0 1.5rem; gap: 1rem; position: sticky; top: 0; background: var(--navy); z-index: 50; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--text-secondary); margin-left: 4px; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 0.45rem 0.9rem; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--orange); color: white; }
+  .btn-primary:hover { background: var(--orange-hover); }
+  .btn-ghost { background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 0.5px solid var(--border); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .btn-sm { padding: 0.3rem 0.65rem; font-size: 12px; }
+  .menu-toggle { display: none; background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; }
+  .content { padding: 1.5rem; flex: 1; }
+
+  /* FILTERS */
+  .filters { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center; }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 300px; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); font-size: 14px; pointer-events: none; }
+  .search-input { width: 100%; background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem 0.5rem 2rem; color: var(--text); font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .search-input:focus { border-color: var(--orange); }
+  .search-input::placeholder { color: var(--text-tertiary); }
+  .filter-select { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; color: var(--text-secondary); font-size: 13px; outline: none; cursor: pointer; -webkit-appearance: none; }
+  .count-label { font-size: 12px; color: var(--text-tertiary); margin-left: auto; }
+
+  /* VIEW TOGGLE */
+  .view-toggle { display: flex; background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .view-btn { background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 0.4rem 0.65rem; font-size: 14px; transition: all 0.15s; }
+  .view-btn.active { background: var(--orange-dim); color: var(--orange); }
+
+  /* GRID VIEW */
+  .obras-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.75rem; }
+  .obra-card { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+  .obra-card:hover { border-color: var(--border-hover); transform: translateY(-1px); }
+  .obra-cover { height: 120px; background: linear-gradient(135deg, var(--navy-light), var(--navy-card)); display: flex; align-items: center; justify-content: center; font-size: 40px; position: relative; overflow: hidden; }
+  .obra-cover-img { width: 100%; height: 100%; object-fit: cover; }
+  .obra-status-badge { position: absolute; top: 8px; right: 8px; }
+  .obra-body { padding: 1rem; }
+  .obra-client { font-size: 10px; color: var(--orange); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.3rem; }
+  .obra-name { font-size: 15px; font-weight: 600; margin-bottom: 0.3rem; }
+  .obra-address { font-size: 11px; color: var(--text-tertiary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 4px; }
+  .obra-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 0.75rem; border-top: 0.5px solid var(--border); }
+  .progress-section { flex: 1; margin-right: 1rem; }
+  .progress-label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .progress-text { font-size: 11px; color: var(--text-secondary); }
+  .progress-pct { font-size: 11px; font-weight: 600; color: var(--orange); }
+  .progress-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.4s; }
+  .next-visit { text-align: right; }
+  .next-label { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .next-date { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+
+  /* LIST VIEW */
+  .obras-list { display: none; }
+  .obras-list.active { display: block; }
+  .obras-grid.active { display: grid; }
+  .table-wrap { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .table-header { display: grid; grid-template-columns: 2.5fr 1.5fr 1fr 1fr 1fr 80px; padding: 0.6rem 1.25rem; border-bottom: 0.5px solid var(--border); background: rgba(255,255,255,0.02); }
+  .th { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); }
+  .obra-row { display: grid; grid-template-columns: 2.5fr 1.5fr 1fr 1fr 1fr 80px; padding: 0.85rem 1.25rem; border-bottom: 0.5px solid var(--border); align-items: center; cursor: pointer; transition: background 0.15s; }
+  .obra-row:last-child { border-bottom: none; }
+  .obra-row:hover { background: rgba(255,255,255,0.03); }
+  .obra-name-cell { display: flex; align-items: center; gap: 10px; }
+  .obra-thumb { width: 34px; height: 34px; background: var(--orange-dim); border: 0.5px solid var(--orange-border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .td { font-size: 13px; color: var(--text-secondary); }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .row-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity 0.15s; }
+  .obra-row:hover .row-actions { opacity: 1; }
+  .btn-icon { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 4px; transition: all 0.15s; }
+  .btn-icon:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+  /* EMPTY */
+  .empty-state { padding: 3rem; text-align: center; color: var(--text-tertiary); }
+  .empty-icon { font-size: 36px; margin-bottom: 0.75rem; }
+  .empty-title { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.4rem; }
+  .empty-sub { font-size: 12px; margin-bottom: 1.25rem; }
+
+  /* DETAIL PANEL */
+  .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; display: none; }
+  .detail-overlay.open { display: block; }
+  .detail-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; background: var(--navy-light); border-left: 0.5px solid var(--border); z-index: 151; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.25s; overflow-y: auto; }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-cover { height: 140px; background: linear-gradient(135deg, #0d2438, #091c2b); display: flex; align-items: center; justify-content: center; font-size: 48px; position: relative; flex-shrink: 0; }
+  .detail-cover-close { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.4); border: none; color: white; cursor: pointer; font-size: 18px; padding: 4px 8px; border-radius: var(--radius-sm); transition: background 0.15s; }
+  .detail-cover-close:hover { background: rgba(0,0,0,0.6); }
+  .detail-cover-badge { position: absolute; top: 12px; left: 12px; }
+  .detail-info { padding: 1.25rem; border-bottom: 0.5px solid var(--border); }
+  .detail-client { font-size: 11px; color: var(--orange); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.3rem; }
+  .detail-name { font-size: 20px; font-weight: 700; margin-bottom: 0.3rem; }
+  .detail-address { font-size: 12px; color: var(--text-tertiary); }
+  .detail-body { padding: 1.25rem; flex: 1; }
+  .detail-section { margin-bottom: 1.5rem; }
+  .detail-section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .info-item .info-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  .info-item .info-value { font-size: 13px; color: var(--text); }
+  .info-item .info-value a { color: var(--orange); text-decoration: none; }
+
+  /* PROGRESSO GRANDE */
+  .progress-big { background: rgba(255,255,255,0.03); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; }
+  .progress-big-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+  .progress-big-label { font-size: 12px; color: var(--text-secondary); }
+  .progress-big-pct { font-size: 28px; font-weight: 700; color: var(--orange); line-height: 1; }
+  .progress-big-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin-bottom: 0.5rem; }
+  .progress-big-fill { height: 100%; background: var(--orange); border-radius: 3px; transition: width 0.6s ease; }
+  .progress-big-footer { font-size: 11px; color: var(--text-tertiary); }
+
+  /* VISITAS LISTA */
+  .visit-item { display: flex; align-items: center; gap: 10px; padding: 0.7rem; background: rgba(255,255,255,0.03); border: 0.5px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 0.5rem; cursor: pointer; transition: background 0.15s; }
+  .visit-item:hover { background: rgba(255,255,255,0.06); }
+  .visit-date-box { width: 38px; text-align: center; flex-shrink: 0; }
+  .visit-day { font-size: 18px; font-weight: 700; color: var(--orange); line-height: 1; }
+  .visit-month { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; }
+  .visit-info { flex: 1; }
+  .visit-pilot { font-size: 12px; font-weight: 500; }
+  .visit-weather { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .visit-pct { font-size: 12px; font-weight: 600; color: var(--orange); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--navy-light); border: 0.5px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+  .modal-header { padding: 1rem 1.25rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 20px; padding: 2px; }
+  .modal-body { padding: 1.25rem; }
+  .modal-footer { padding: 1rem 1.25rem; border-top: 0.5px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  .form-group { margin-bottom: 1rem; }
+  .form-label { display: block; font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-input, .form-select, .form-textarea { width: 100%; background: rgba(255,255,255,0.05); border: 0.5px solid rgba(255,255,255,0.1); border-radius: var(--radius-sm); padding: 0.65rem 0.75rem; color: var(--text); font-size: 13px; outline: none; transition: border-color 0.15s; -webkit-appearance: none; }
+  .form-input:focus, .form-select:focus { border-color: var(--orange); }
+  .form-input::placeholder { color: rgba(255,255,255,0.2); }
+  .form-select option { background: var(--navy-light); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .form-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 0.3rem; }
+
+  /* LOADING & TOAST */
+  .loading-screen { position: fixed; inset: 0; background: var(--navy); display: flex; align-items: center; justify-content: center; z-index: 999; flex-direction: column; gap: 1rem; }
+  .loading-screen.hidden { display: none; }
+  .spin { width: 32px; height: 32px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--navy-light); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; font-size: 13px; display: flex; align-items: center; gap: 8px; transform: translateY(100px); opacity: 0; transition: all 0.25s; z-index: 300; max-width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-success { border-left: 3px solid var(--green); }
+  .toast-error { border-left: 3px solid var(--red); }
+
+  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99; }
+  .sidebar-overlay.open { display: block; }
+
+  @media (max-width: 900px) {
+    .table-header { grid-template-columns: 2fr 1fr 80px; }
+    .obra-row { grid-template-columns: 2fr 1fr 80px; }
+    .th:nth-child(3), .td:nth-child(3),
+    .th:nth-child(4), .td:nth-child(4),
+    .th:nth-child(5), .td:nth-child(5) { display: none; }
+    .obras-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .menu-toggle { display: block; }
+    .detail-panel { width: 100%; }
+    .content { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <svg width="32" height="32" viewBox="0 0 100 100"><path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/></svg>
+  <div class="spin"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo" onclick="window.location.href='ottus_dashboard.html'">
+      <div class="logo-tt"><svg viewBox="0 0 100 100" fill="none"><path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/></svg></div>
+      <div><div class="logo-name">OTTUS</div><div class="logo-sub">Portal de Obras</div></div>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      <div class="sidebar-section">Principal</div>
+      <button class="nav-item" onclick="window.location.href='ottus_dashboard.html'"><span class="nav-icon">⊞</span> Dashboard</button>
+      <button class="nav-item active"><span class="nav-icon">🏗</span> Obras</button>
+      <button class="nav-item" onclick="window.location.href='ottus_clientes.html'"><span class="nav-icon">🏢</span> Clientes</button>
+      <button class="nav-item" onclick="window.location.href='ottus_visitas.html'"><span class="nav-icon">📋</span> Visitas</button>
+      <div class="sidebar-section">Operacional</div>
+      <button class="nav-item"><span class="nav-icon">📅</span> Solicitações</button>
+      <button class="nav-item"><span class="nav-icon">👤</span> Usuários</button>
+      <button class="nav-item"><span class="nav-icon">⚡</span> Serviços</button>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="user-row">
+        <div class="user-avatar" id="userAvatar">I</div>
+        <div><div class="user-name" id="userName">...</div><div class="user-role">Administrador</div></div>
+        <button class="logout-btn" onclick="logout()">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="header">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+      <div><span class="header-title">Obras</span><span class="header-sub" id="headerCount"></span></div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openModal('modalObra')">+ Nova Obra</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="filters">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="searchInput" placeholder="Buscar obra ou cliente..." oninput="filtrar()"/>
+        </div>
+        <select class="filter-select" id="filterStatus" onchange="filtrar()">
+          <option value="">Todos os status</option>
+          <option value="active">Ativas</option>
+          <option value="paused">Pausadas</option>
+          <option value="completed">Concluídas</option>
+        </select>
+        <select class="filter-select" id="filterCliente" onchange="filtrar()">
+          <option value="">Todos os clientes</option>
+        </select>
+        <div class="view-toggle">
+          <button class="view-btn active" id="btnGrid" onclick="setView('grid')" title="Grade">⊞</button>
+          <button class="view-btn" id="btnList" onclick="setView('list')" title="Lista">≡</button>
+        </div>
+        <span class="count-label" id="countLabel"></span>
+      </div>
+
+      <!-- GRID -->
+      <div class="obras-grid active" id="obrasGrid"></div>
+
+      <!-- LIST -->
+      <div class="obras-list" id="obrasList">
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="th">Obra</div>
+            <div class="th">Cliente</div>
+            <div class="th">Progresso</div>
+            <div class="th">Próx. visita</div>
+            <div class="th">Status</div>
+            <div class="th"></div>
+          </div>
+          <div id="obrasListBody"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-cover" id="detailCover">
+    🏗
+    <button class="detail-cover-close" onclick="closeDetail()">×</button>
+    <div class="detail-cover-badge" id="detailCoverBadge"></div>
+  </div>
+  <div class="detail-info">
+    <div class="detail-client" id="detailClient"></div>
+    <div class="detail-name" id="detailName"></div>
+    <div class="detail-address" id="detailAddress"></div>
+  </div>
+  <div class="detail-body">
+
+    <div class="detail-section">
+      <div class="detail-section-title">Progresso da obra</div>
+      <div class="progress-big">
+        <div class="progress-big-header">
+          <span class="progress-big-label">Avanço geral</span>
+          <span class="progress-big-pct" id="detailPct">—%</span>
+        </div>
+        <div class="progress-big-bar"><div class="progress-big-fill" id="detailPctBar" style="width:0%"></div></div>
+        <div class="progress-big-footer" id="detailPctFooter">Baseado na última visita publicada</div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Informações</div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Início</div><div class="info-value" id="detailInicio">—</div></div>
+        <div class="info-item"><div class="info-label">Previsão de término</div><div class="info-value" id="detailFim">—</div></div>
+        <div class="info-item"><div class="info-label">Frequência</div><div class="info-value" id="detailFreq">—</div></div>
+        <div class="info-item"><div class="info-label">Próxima visita</div><div class="info-value" id="detailProxima">—</div></div>
+        <div class="info-item" style="grid-column:span 2"><div class="info-label">Google Drive</div><div class="info-value" id="detailDrive">—</div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">
+        Visitas realizadas
+        <button class="btn btn-primary btn-sm" onclick="abrirNovaVisita()">+ Visita</button>
+      </div>
+      <div id="detailVisitas"><div style="font-size:12px;color:var(--text-tertiary)">Nenhuma visita registrada</div></div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Ações</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="editarObra()">✏ Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="alterarStatus('paused')">⏸ Pausar</button>
+        <button class="btn btn-ghost btn-sm" onclick="alterarStatus('completed')">✓ Concluir</button>
+        <button class="btn btn-sm" style="background:var(--red-dim);color:var(--red)" onclick="confirmarExcluir()">✕ Excluir</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL NOVA/EDITAR OBRA -->
+<div class="modal-overlay" id="modalObra">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalObraTitle">Nova Obra</div>
+      <button class="modal-close" onclick="closeModal('modalObra')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="obraId"/>
+      <div class="form-group">
+        <label class="form-label">Cliente *</label>
+        <select class="form-select" id="obraCliente"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nome da obra *</label>
+        <input class="form-input" id="obraNome" placeholder="Ex: Edifício Alphaville Torre A"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Endereço</label>
+        <input class="form-input" id="obraEndereco" placeholder="Rua, número, bairro, cidade"/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Data de início</label>
+          <input class="form-input" id="obraInicio" type="date"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Previsão de término</label>
+          <input class="form-input" id="obraFim" type="date"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Frequência de visitas</label>
+          <select class="form-select" id="obraFrequencia">
+            <option value="quinzenal">Quinzenal</option>
+            <option value="mensal">Mensal</option>
+            <option value="semanal">Semanal</option>
+            <option value="sob demanda">Sob demanda</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Próxima visita</label>
+          <input class="form-input" id="obraProximaVisita" type="date"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Link Google Drive da obra</label>
+        <input class="form-input" id="obraDrive" placeholder="https://drive.google.com/..."/>
+        <div class="form-hint">Pasta onde ficam todos os materiais desta obra</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalObra')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarObra()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOVA VISITA -->
+<div class="modal-overlay" id="modalVisita">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nova Visita</div>
+      <button class="modal-close" onclick="closeModal('modalVisita')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="visitaSiteId"/>
+      <div class="form-group">
+        <label class="form-label">Obra</label>
+        <input class="form-input" id="visitaObraNome" disabled style="opacity:0.6"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Piloto *</label>
+        <select class="form-select" id="visitaPiloto"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Data da visita *</label>
+          <input class="form-input" id="visitaData" type="date"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Horário de início</label>
+          <input class="form-input" id="visitaHorario" type="time"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observações</label>
+        <textarea class="form-textarea" id="visitaObs" placeholder="Alguma instrução especial para essa visita?"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalVisita')">Cancelar</button>
+      <button class="btn btn-primary" onclick="criarVisita()">Agendar Visita</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM EXCLUIR -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-body" style="text-align:center;padding:1.5rem">
+      <div style="font-size:32px;margin-bottom:0.75rem">⚠</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:0.5rem">Excluir obra?</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:1.25rem;line-height:1.5">Todas as visitas, relatórios e mídias desta obra serão removidos permanentemente.</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button class="btn btn-ghost" onclick="closeModal('modalConfirm')">Cancelar</button>
+        <button class="btn btn-sm" style="background:var(--red);color:white" onclick="excluirObra()">Excluir permanentemente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://zjjinojrghquzeqrdmoj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_uJmCKXdFbkU6-nSkYChkRQ_whLqPdE8';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let todasObras = [];
+let clientes = [];
+let pilotos = [];
+let obraSelecionada = null;
+let viewMode = 'grid';
+
+const statusMap = {
+  active:    { label: 'Ativa',     cls: 'badge-green',  icon: '🟢' },
+  paused:    { label: 'Pausada',   cls: 'badge-yellow', icon: '🟡' },
+  completed: { label: 'Concluída', cls: 'badge-dot',    icon: '⚫' },
+};
+const weatherMap = {
+  sunny: '☀️ Sol', partly_cloudy: '⛅ Parcialmente nublado',
+  cloudy: '☁️ Nublado', light_wind: '🌬 Vento leve', strong_wind: '💨 Vento forte'
+};
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'ottus_login.html'; return; }
+  const { data: u } = await sb.from('users').select('*').eq('id', session.user.id).single();
+  if (!u || u.role !== 'admin') { await sb.auth.signOut(); window.location.href = 'ottus_login.html'; return; }
+  document.getElementById('userName').textContent = u.name || 'Admin';
+  document.getElementById('userAvatar').textContent = (u.name || 'A')[0].toUpperCase();
+  await Promise.all([carregarObras(), carregarClientes(), carregarPilotos()]);
+  document.getElementById('loadingScreen').classList.add('hidden');
+}
+
+async function carregarObras() {
+  const { data } = await sb
+    .from('sites')
+    .select('*, clients(company_name)')
+    .order('created_at', { ascending: false });
+  todasObras = data || [];
+  document.getElementById('headerCount').textContent = `${todasObras.length} obra${todasObras.length !== 1 ? 's' : ''}`;
+  filtrar();
+}
+
+async function carregarClientes() {
+  const { data } = await sb.from('clients').select('id, company_name').eq('active', true).order('company_name');
+  clientes = data || [];
+  const sel = document.getElementById('filterCliente');
+  const selObra = document.getElementById('obraCliente');
+  clientes.forEach(c => {
+    sel.innerHTML += `<option value="${c.id}">${c.company_name}</option>`;
+    selObra.innerHTML += `<option value="${c.id}">${c.company_name}</option>`;
+  });
+}
+
+async function carregarPilotos() {
+  const { data } = await sb.from('users').select('id, name').in('role', ['admin', 'pilot']).eq('active', true);
+  pilotos = data || [];
+  const sel = document.getElementById('visitaPiloto');
+  sel.innerHTML = '<option value="">Selecione o piloto...</option>';
+  pilotos.forEach(p => sel.innerHTML += `<option value="${p.id}">${p.name}</option>`);
+}
+
+function filtrar() {
+  const busca = document.getElementById('searchInput').value.toLowerCase();
+  const status = document.getElementById('filterStatus').value;
+  const clienteId = document.getElementById('filterCliente').value;
+  let lista = todasObras.filter(o => {
+    const matchBusca = o.name.toLowerCase().includes(busca) || (o.clients?.company_name || '').toLowerCase().includes(busca);
+    const matchStatus = !status || o.status === status;
+    const matchCliente = !clienteId || o.client_id === clienteId;
+    return matchBusca && matchStatus && matchCliente;
+  });
+  document.getElementById('countLabel').textContent = `${lista.length} resultado${lista.length !== 1 ? 's' : ''}`;
+  renderGrid(lista);
+  renderList(lista);
+}
+
+function renderGrid(lista) {
+  const el = document.getElementById('obrasGrid');
+  if (!lista.length) {
+    el.innerHTML = `<div style="grid-column:1/-1"><div class="empty-state"><div class="empty-icon">🏗</div><div class="empty-title">Nenhuma obra encontrada</div><div class="empty-sub">Cadastre a primeira obra para começar</div><button class="btn btn-primary" onclick="openModal('modalObra')">+ Nova Obra</button></div></div>`;
+    return;
+  }
+  el.innerHTML = lista.map(o => {
+    const s = statusMap[o.status] || statusMap.active;
+    const proxima = o.next_visit_date ? new Date(o.next_visit_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    return `
+      <div class="obra-card" onclick="abrirDetalhe('${o.id}')">
+        <div class="obra-cover">
+          🏗
+          <div class="obra-status-badge"><span class="badge ${s.cls}"><span class="badge-dot"></span>${s.label}</span></div>
+        </div>
+        <div class="obra-body">
+          <div class="obra-client">${o.clients?.company_name || '—'}</div>
+          <div class="obra-name">${o.name}</div>
+          <div class="obra-address">${o.address || 'Endereço não informado'}</div>
+          <div class="obra-footer">
+            <div class="progress-section">
+              <div class="progress-label">
+                <span class="progress-text">Progresso</span>
+                <span class="progress-pct" id="pct-${o.id}">—</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" id="fill-${o.id}" style="width:0%"></div></div>
+            </div>
+            <div class="next-visit">
+              <div class="next-label">Próx. visita</div>
+              <div class="next-date">${proxima}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+  carregarProgressos(lista);
+}
+
+function renderList(lista) {
+  const el = document.getElementById('obrasListBody');
+  if (!lista.length) { el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏗</div><div class="empty-title">Nenhuma obra encontrada</div></div>`; return; }
+  el.innerHTML = lista.map(o => {
+    const s = statusMap[o.status] || statusMap.active;
+    const proxima = o.next_visit_date ? new Date(o.next_visit_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    return `
+      <div class="obra-row" onclick="abrirDetalhe('${o.id}')">
+        <div class="obra-name-cell">
+          <div class="obra-thumb">🏗</div>
+          <div>
+            <div style="font-size:13px;font-weight:500">${o.name}</div>
+            <div style="font-size:11px;color:var(--text-tertiary)">${o.address || '—'}</div>
+          </div>
+        </div>
+        <div class="td">${o.clients?.company_name || '—'}</div>
+        <div class="td"><span id="pct-list-${o.id}">—</span></div>
+        <div class="td">${proxima}</div>
+        <div class="td"><span class="badge ${s.cls}"><span class="badge-dot"></span>${s.label}</span></div>
+        <div class="row-actions">
+          <button class="btn-icon" onclick="event.stopPropagation();abrirEditar('${o.id}')" title="Editar">✏</button>
+        </div>
+      </div>`;
+  }).join('');
+  carregarProgressos(lista);
+}
+
+async function carregarProgressos(lista) {
+  for (const o of lista) {
+    const { data } = await sb.from('visits').select('progress_pct').eq('site_id', o.id).eq('status', 'published').order('visit_date', { ascending: false }).limit(1).single();
+    if (data) {
+      const pct = data.progress_pct;
+      const fillEl = document.getElementById(`fill-${o.id}`);
+      const pctEl = document.getElementById(`pct-${o.id}`);
+      const pctListEl = document.getElementById(`pct-list-${o.id}`);
+      if (fillEl) fillEl.style.width = `${pct}%`;
+      if (pctEl) pctEl.textContent = `${pct}%`;
+      if (pctListEl) pctListEl.textContent = `${pct}%`;
+    }
+  }
+}
+
+async function abrirDetalhe(id) {
+  obraSelecionada = todasObras.find(o => o.id === id);
+  if (!obraSelecionada) return;
+  const o = obraSelecionada;
+  const s = statusMap[o.status] || statusMap.active;
+
+  document.getElementById('detailClient').textContent = o.clients?.company_name || '—';
+  document.getElementById('detailName').textContent = o.name;
+  document.getElementById('detailAddress').textContent = o.address || 'Endereço não informado';
+  document.getElementById('detailCoverBadge').innerHTML = `<span class="badge ${s.cls}"><span class="badge-dot"></span>${s.label}</span>`;
+  document.getElementById('detailInicio').textContent = o.start_date ? new Date(o.start_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  document.getElementById('detailFim').textContent = o.expected_end_date ? new Date(o.expected_end_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  document.getElementById('detailFreq').textContent = o.visit_frequency || '—';
+  document.getElementById('detailProxima').textContent = o.next_visit_date ? new Date(o.next_visit_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  document.getElementById('detailDrive').innerHTML = o.drive_folder_url ? `<a href="${o.drive_folder_url}" target="_blank">Abrir pasta ↗</a>` : '—';
+
+  // Visitas
+  const { data: visitas } = await sb
+    .from('visits')
+    .select('*, users!visits_pilot_id_fkey(name)')
+    .eq('site_id', id)
+    .order('visit_date', { ascending: false })
+    .limit(10);
+
+  // Progresso da última visita publicada
+  const ultima = visitas?.find(v => v.status === 'published' && v.progress_pct != null);
+  if (ultima) {
+    document.getElementById('detailPct').textContent = `${ultima.progress_pct}%`;
+    document.getElementById('detailPctBar').style.width = `${ultima.progress_pct}%`;
+    document.getElementById('detailPctFooter').textContent = `Última atualização: ${new Date(ultima.visit_date + 'T00:00:00').toLocaleDateString('pt-BR')}`;
+  } else {
+    document.getElementById('detailPct').textContent = '—';
+    document.getElementById('detailPctBar').style.width = '0%';
+    document.getElementById('detailPctFooter').textContent = 'Nenhuma visita publicada ainda';
+  }
+
+  const visitaEl = document.getElementById('detailVisitas');
+  if (!visitas?.length) {
+    visitaEl.innerHTML = `<div style="font-size:12px;color:var(--text-tertiary)">Nenhuma visita registrada</div>`;
+  } else {
+    const statusVisita = { draft: { l: 'Rascunho', c: 'badge-yellow' }, awaiting_media: { l: 'Ag. mídia', c: 'badge-yellow' }, published: { l: 'Publicado', c: 'badge-green' } };
+    visitaEl.innerHTML = visitas.map(v => {
+      const d = new Date(v.visit_date + 'T00:00:00');
+      const sv = statusVisita[v.status] || statusVisita.draft;
+      return `
+        <div class="visit-item">
+          <div class="visit-date-box">
+            <div class="visit-day">${d.getDate().toString().padStart(2,'0')}</div>
+            <div class="visit-month">${d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','')}</div>
+          </div>
+          <div class="visit-info">
+            <div class="visit-pilot">${v.users?.name || 'Piloto não informado'}</div>
+            <div class="visit-weather">${weatherMap[v.weather] || '—'}</div>
+          </div>
+          ${v.progress_pct != null ? `<div class="visit-pct">${v.progress_pct}%</div>` : ''}
+          <span class="badge ${sv.c}">${sv.l}</span>
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('detailOverlay').classList.add('open');
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('open');
+  document.getElementById('detailPanel').classList.remove('open');
+}
+
+async function salvarObra() {
+  const id = document.getElementById('obraId').value;
+  const clienteId = document.getElementById('obraCliente').value;
+  const nome = document.getElementById('obraNome').value.trim();
+  if (!clienteId) { toast('Selecione o cliente', 'error'); return; }
+  if (!nome) { toast('Informe o nome da obra', 'error'); return; }
+
+  const payload = {
+    client_id: clienteId,
+    name: nome,
+    address: document.getElementById('obraEndereco').value.trim() || null,
+    start_date: document.getElementById('obraInicio').value || null,
+    expected_end_date: document.getElementById('obraFim').value || null,
+    visit_frequency: document.getElementById('obraFrequencia').value,
+    next_visit_date: document.getElementById('obraProximaVisita').value || null,
+    drive_folder_url: document.getElementById('obraDrive').value.trim() || null,
+  };
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from('sites').update(payload).eq('id', id));
+  } else {
+    ({ error } = await sb.from('sites').insert({ ...payload, status: 'active' }));
+  }
+
+  if (error) { toast('Erro: ' + error.message, 'error'); return; }
+  toast(id ? 'Obra atualizada!' : 'Obra criada!', 'success');
+  closeModal('modalObra');
+  limparModalObra();
+  await carregarObras();
+  if (obraSelecionada) await abrirDetalhe(obraSelecionada.id);
+}
+
+function limparModalObra() {
+  ['obraId','obraNome','obraEndereco','obraInicio','obraFim','obraProximaVisita','obraDrive'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modalObraTitle').textContent = 'Nova Obra';
+}
+
+function abrirEditar(id) {
+  const o = todasObras.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('obraId').value = o.id;
+  document.getElementById('obraCliente').value = o.client_id;
+  document.getElementById('obraNome').value = o.name;
+  document.getElementById('obraEndereco').value = o.address || '';
+  document.getElementById('obraInicio').value = o.start_date || '';
+  document.getElementById('obraFim').value = o.expected_end_date || '';
+  document.getElementById('obraFrequencia').value = o.visit_frequency || 'quinzenal';
+  document.getElementById('obraProximaVisita').value = o.next_visit_date || '';
+  document.getElementById('obraDrive').value = o.drive_folder_url || '';
+  document.getElementById('modalObraTitle').textContent = 'Editar Obra';
+  openModal('modalObra');
+}
+
+function editarObra() { if (obraSelecionada) abrirEditar(obraSelecionada.id); }
+
+async function alterarStatus(novoStatus) {
+  if (!obraSelecionada) return;
+  const { error } = await sb.from('sites').update({ status: novoStatus }).eq('id', obraSelecionada.id);
+  if (error) { toast('Erro ao atualizar status', 'error'); return; }
+  toast('Status atualizado!', 'success');
+  closeDetail();
+  await carregarObras();
+}
+
+function confirmarExcluir() { openModal('modalConfirm'); }
+async function excluirObra() {
+  if (!obraSelecionada) return;
+  const { error } = await sb.from('sites').delete().eq('id', obraSelecionada.id);
+  if (error) { toast('Erro ao excluir', 'error'); return; }
+  toast('Obra excluída', 'success');
+  closeModal('modalConfirm');
+  closeDetail();
+  await carregarObras();
+}
+
+function abrirNovaVisita() {
+  if (!obraSelecionada) return;
+  document.getElementById('visitaSiteId').value = obraSelecionada.id;
+  document.getElementById('visitaObraNome').value = obraSelecionada.name;
+  openModal('modalVisita');
+}
+
+async function criarVisita() {
+  const siteId = document.getElementById('visitaSiteId').value;
+  const pilotoId = document.getElementById('visitaPiloto').value;
+  const data = document.getElementById('visitaData').value;
+  if (!pilotoId) { toast('Selecione o piloto', 'error'); return; }
+  if (!data) { toast('Informe a data', 'error'); return; }
+
+  const { error } = await sb.from('visits').insert({
+    site_id: siteId,
+    pilot_id: pilotoId,
+    visit_date: data,
+    start_time: document.getElementById('visitaHorario').value || null,
+    general_notes: document.getElementById('visitaObs').value.trim() || null,
+    status: 'draft',
+  });
+
+  if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+  // Atualiza próxima visita da obra
+  await sb.from('sites').update({ next_visit_date: data }).eq('id', siteId);
+
+  toast('Visita agendada!', 'success');
+  closeModal('modalVisita');
+  await carregarObras();
+  await abrirDetalhe(siteId);
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('obrasGrid').classList.toggle('active', mode === 'grid');
+  document.getElementById('obrasList').classList.toggle('active', mode === 'list');
+  document.getElementById('btnGrid').classList.toggle('active', mode === 'grid');
+  document.getElementById('btnList').classList.toggle('active', mode === 'list');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }); });
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebarOverlay').classList.toggle('open'); }
+function toast(msg, type = 'success') { const el = document.getElementById('toast'); el.className = `toast toast-${type} show`; el.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`; setTimeout(() => el.classList.remove('show'), 3500); }
+async function logout() { await sb.auth.signOut(); window.location.href = 'ottus_login.html'; }
+
+init();
+</script>
+</body>
+</html>

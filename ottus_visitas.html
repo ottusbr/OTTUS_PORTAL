@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTTUS Portal — Visitas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #091c2b;
+    --navy-light: #0d2438;
+    --navy-card: #0f2a3d;
+    --orange: #d85a30;
+    --orange-hover: #c04e28;
+    --orange-dim: rgba(216,90,48,0.12);
+    --orange-border: rgba(216,90,48,0.25);
+    --text: #ffffff;
+    --text-secondary: rgba(255,255,255,0.5);
+    --text-tertiary: rgba(255,255,255,0.3);
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.12);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --sidebar-w: 220px;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: var(--navy); color: var(--text); min-height: 100vh; font-size: 14px; }
+  .layout { display: flex; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar-w); background: var(--navy-light); border-right: 0.5px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: transform 0.25s; }
+  .sidebar-logo { padding: 1.25rem 1rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .logo-tt svg { width: 28px; height: 28px; }
+  .logo-name { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; }
+  .logo-sub { font-size: 9px; color: var(--orange); letter-spacing: 0.12em; text-transform: uppercase; }
+  .sidebar-section { padding: 0.75rem 0.75rem 0.25rem; font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 0.6rem 0.75rem; margin: 1px 0.5rem; border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; transition: background 0.15s, color 0.15s; font-size: 13px; border: none; background: none; width: calc(100% - 1rem); text-align: left; }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-item.active { background: var(--orange-dim); color: var(--orange); }
+  .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+  .nav-badge { margin-left: auto; background: var(--orange); color: white; font-size: 10px; font-weight: 700; border-radius: 20px; padding: 1px 6px; min-width: 18px; text-align: center; }
+  .sidebar-bottom { margin-top: auto; padding: 0.75rem; border-top: 0.5px solid var(--border); }
+  .user-row { display: flex; align-items: center; gap: 10px; padding: 0.5rem; border-radius: var(--radius-sm); }
+  .user-avatar { width: 30px; height: 30px; background: var(--orange-dim); border: 0.5px solid var(--orange-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--orange); }
+  .user-name { font-size: 12px; font-weight: 500; }
+  .user-role { font-size: 10px; color: var(--text-secondary); }
+  .logout-btn { margin-left: auto; background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 16px; padding: 4px; transition: color 0.15s; }
+  .logout-btn:hover { color: var(--red); }
+
+  /* MAIN */
+  .main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+  .header { height: 56px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; padding: 0 1.5rem; gap: 1rem; position: sticky; top: 0; background: var(--navy); z-index: 50; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--text-secondary); margin-left: 4px; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 0.45rem 0.9rem; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--orange); color: white; }
+  .btn-primary:hover { background: var(--orange-hover); }
+  .btn-ghost { background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 0.5px solid var(--border); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .btn-sm { padding: 0.3rem 0.65rem; font-size: 12px; }
+  .menu-toggle { display: none; background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; }
+  .content { padding: 1.5rem; flex: 1; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 0; background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 3px; margin-bottom: 1.25rem; width: fit-content; }
+  .tab { padding: 0.4rem 1rem; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-secondary); transition: all 0.15s; border: none; background: none; }
+  .tab.active { background: var(--orange); color: white; }
+
+  /* FILTERS */
+  .filters { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center; }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 280px; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); font-size: 14px; pointer-events: none; }
+  .search-input { width: 100%; background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem 0.5rem 2rem; color: var(--text); font-size: 13px; outline: none; }
+  .search-input::placeholder { color: var(--text-tertiary); }
+  .search-input:focus { border-color: var(--orange); }
+  .filter-select { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; color: var(--text-secondary); font-size: 13px; outline: none; cursor: pointer; -webkit-appearance: none; }
+
+  /* TIMELINE */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .timeline-month { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); padding: 1rem 0 0.5rem; }
+  .visit-card { background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.5rem; cursor: pointer; transition: border-color 0.15s; display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: center; }
+  .visit-card:hover { border-color: var(--border-hover); }
+  .visit-card.status-published { border-left: 3px solid var(--green); }
+  .visit-card.status-awaiting_media { border-left: 3px solid var(--yellow); }
+  .visit-card.status-draft { border-left: 3px solid rgba(255,255,255,0.15); }
+  .visit-date-col { text-align: center; min-width: 44px; }
+  .visit-day { font-size: 22px; font-weight: 700; color: var(--orange); line-height: 1; }
+  .visit-weekday { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .visit-month-sm { font-size: 10px; color: var(--text-tertiary); }
+  .visit-main { flex: 1; }
+  .visit-site-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .visit-client-name { font-size: 11px; color: var(--orange); font-weight: 500; margin-bottom: 6px; }
+  .visit-meta { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .visit-meta-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+  .visit-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-gray { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .visit-pct { font-size: 16px; font-weight: 700; color: var(--orange); }
+
+  /* STATUS TABS COUNT */
+  .tab-count { display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); color: var(--text-secondary); font-size: 10px; font-weight: 700; border-radius: 20px; padding: 1px 6px; margin-left: 5px; min-width: 18px; }
+  .tab.active .tab-count { background: rgba(255,255,255,0.25); color: white; }
+
+  /* EMPTY */
+  .empty-state { padding: 3rem; text-align: center; color: var(--text-tertiary); background: var(--navy-card); border: 0.5px solid var(--border); border-radius: var(--radius); }
+  .empty-icon { font-size: 36px; margin-bottom: 0.75rem; }
+  .empty-title { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.4rem; }
+  .empty-sub { font-size: 12px; margin-bottom: 1.25rem; }
+
+  /* DETAIL PANEL */
+  .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; display: none; }
+  .detail-overlay.open { display: block; }
+  .detail-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 540px; background: var(--navy-light); border-left: 0.5px solid var(--border); z-index: 151; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.25s; overflow-y: auto; }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-top { padding: 1.25rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; position: sticky; top: 0; background: var(--navy-light); z-index: 1; }
+  .detail-top-info { flex: 1; }
+  .detail-site { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+  .detail-client { font-size: 12px; color: var(--orange); font-weight: 500; margin-bottom: 8px; }
+  .detail-date { font-size: 13px; color: var(--text-secondary); }
+  .detail-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 20px; padding: 4px; flex-shrink: 0; }
+  .detail-body { padding: 1.25rem; }
+  .section { margin-bottom: 1.5rem; }
+  .section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .info-item .lbl { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  .info-item .val { font-size: 13px; color: var(--text); }
+
+  /* PROGRESSO */
+  .pct-display { display: flex; align-items: center; gap: 1rem; background: rgba(255,255,255,0.03); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; }
+  .pct-number { font-size: 36px; font-weight: 700; color: var(--orange); line-height: 1; }
+  .pct-bar-wrap { flex: 1; }
+  .pct-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+  .pct-bar { height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+  .pct-fill { height: 100%; background: var(--orange); border-radius: 4px; transition: width 0.5s ease; }
+  .pct-notes { font-size: 12px; color: var(--text-secondary); margin-top: 0.75rem; line-height: 1.5; font-style: italic; }
+
+  /* PONTOS DE ATENÇÃO */
+  .attention-item { background: rgba(255,255,255,0.03); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem; margin-bottom: 0.5rem; }
+  .attention-header { display: flex; align-items: center; gap: 8px; margin-bottom: 0.4rem; }
+  .attention-num { background: var(--red-dim); color: var(--red); font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 7px; }
+  .attention-location { font-size: 12px; font-weight: 500; color: var(--text); }
+  .attention-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .attention-img { width: 100%; border-radius: var(--radius-sm); margin-top: 0.5rem; max-height: 160px; object-fit: cover; cursor: pointer; }
+
+  /* MÍDIA GRID */
+  .media-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .media-thumb { aspect-ratio: 16/9; background: rgba(255,255,255,0.05); border: 0.5px solid var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; transition: background 0.15s; overflow: hidden; position: relative; }
+  .media-thumb:hover { background: rgba(255,255,255,0.08); }
+  .media-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .media-type-badge { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); border-radius: 3px; font-size: 9px; padding: 1px 4px; color: white; }
+
+  /* STATUS ACTIONS */
+  .status-bar { background: rgba(255,255,255,0.03); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .status-label { font-size: 12px; color: var(--text-secondary); flex: 1; }
+  .status-action-btns { display: flex; gap: 6px; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--navy-light); border: 0.5px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+  .modal-header { padding: 1rem 1.25rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 20px; padding: 2px; }
+  .modal-body { padding: 1.25rem; }
+  .modal-footer { padding: 1rem 1.25rem; border-top: 0.5px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  .form-group { margin-bottom: 1rem; }
+  .form-label { display: block; font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-input, .form-select, .form-textarea { width: 100%; background: rgba(255,255,255,0.05); border: 0.5px solid rgba(255,255,255,0.1); border-radius: var(--radius-sm); padding: 0.65rem 0.75rem; color: var(--text); font-size: 13px; outline: none; transition: border-color 0.15s; -webkit-appearance: none; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--orange); }
+  .form-input::placeholder, .form-textarea::placeholder { color: rgba(255,255,255,0.2); }
+  .form-select option { background: var(--navy-light); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+  /* LOADING & TOAST */
+  .loading-screen { position: fixed; inset: 0; background: var(--navy); display: flex; align-items: center; justify-content: center; z-index: 999; flex-direction: column; gap: 1rem; }
+  .loading-screen.hidden { display: none; }
+  .spin { width: 32px; height: 32px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--navy-light); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; font-size: 13px; display: flex; align-items: center; gap: 8px; transform: translateY(100px); opacity: 0; transition: all 0.25s; z-index: 300; max-width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-success { border-left: 3px solid var(--green); }
+  .toast-error { border-left: 3px solid var(--red); }
+  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99; }
+  .sidebar-overlay.open { display: block; }
+
+  @media (max-width: 640px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .menu-toggle { display: block; }
+    .detail-panel { width: 100%; }
+    .content { padding: 1rem; }
+    .visit-card { grid-template-columns: auto 1fr; }
+    .visit-right { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <svg width="32" height="32" viewBox="0 0 100 100"><path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/></svg>
+  <div class="spin"></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo" onclick="window.location.href='ottus_dashboard.html'">
+      <div class="logo-tt"><svg viewBox="0 0 100 100" fill="none"><path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/></svg></div>
+      <div><div class="logo-name">OTTUS</div><div class="logo-sub">Portal de Obras</div></div>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      <div class="sidebar-section">Principal</div>
+      <button class="nav-item" onclick="window.location.href='ottus_dashboard.html'"><span class="nav-icon">⊞</span> Dashboard</button>
+      <button class="nav-item" onclick="window.location.href='ottus_obras.html'"><span class="nav-icon">🏗</span> Obras</button>
+      <button class="nav-item" onclick="window.location.href='ottus_clientes.html'"><span class="nav-icon">🏢</span> Clientes</button>
+      <button class="nav-item active"><span class="nav-icon">📋</span> Visitas <span class="nav-badge" id="badgePendentes" style="display:none">0</span></button>
+      <div class="sidebar-section">Operacional</div>
+      <button class="nav-item"><span class="nav-icon">📅</span> Solicitações</button>
+      <button class="nav-item"><span class="nav-icon">👤</span> Usuários</button>
+      <button class="nav-item"><span class="nav-icon">⚡</span> Serviços</button>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="user-row">
+        <div class="user-avatar" id="userAvatar">I</div>
+        <div><div class="user-name" id="userName">...</div><div class="user-role">Administrador</div></div>
+        <button class="logout-btn" onclick="logout()">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="header">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+      <div><span class="header-title">Visitas</span><span class="header-sub" id="headerCount"></span></div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openModal('modalVisita')">+ Nova Visita</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab active" id="tabTodas" onclick="setTab('todas')">Todas <span class="tab-count" id="cntTodas">0</span></button>
+        <button class="tab" id="tabPendentes" onclick="setTab('pendentes')">Pendentes <span class="tab-count" id="cntPendentes">0</span></button>
+        <button class="tab" id="tabPublicadas" onclick="setTab('publicadas')">Publicadas <span class="tab-count" id="cntPublicadas">0</span></button>
+        <button class="tab" id="tabProximas" onclick="setTab('proximas')">Próximas <span class="tab-count" id="cntProximas">0</span></button>
+      </div>
+
+      <!-- FILTERS -->
+      <div class="filters">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="searchInput" placeholder="Buscar obra ou cliente..." oninput="filtrar()"/>
+        </div>
+        <select class="filter-select" id="filterObra" onchange="filtrar()">
+          <option value="">Todas as obras</option>
+        </select>
+        <select class="filter-select" id="filterPiloto" onchange="filtrar()">
+          <option value="">Todos os pilotos</option>
+        </select>
+      </div>
+
+      <!-- LISTA -->
+      <div id="visitasList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-top">
+    <div class="detail-top-info">
+      <div class="detail-site" id="detailSite">—</div>
+      <div class="detail-client" id="detailClient">—</div>
+      <div class="detail-date" id="detailDate">—</div>
+    </div>
+    <button class="detail-close" onclick="closeDetail()">×</button>
+  </div>
+  <div class="detail-body">
+
+    <!-- STATUS BAR -->
+    <div class="status-bar" id="statusBar">
+      <span class="status-label" id="statusLabel">—</span>
+      <div class="status-action-btns" id="statusActions"></div>
+    </div>
+
+    <!-- IDENTIFICAÇÃO -->
+    <div class="section">
+      <div class="section-title">Identificação da visita</div>
+      <div class="info-grid">
+        <div class="info-item"><div class="lbl">Piloto</div><div class="val" id="dPiloto">—</div></div>
+        <div class="info-item"><div class="lbl">Recebeu no local</div><div class="val" id="dContato">—</div></div>
+        <div class="info-item"><div class="lbl">Horário</div><div class="val" id="dHorario">—</div></div>
+        <div class="info-item"><div class="lbl">Clima</div><div class="val" id="dClima">—</div></div>
+        <div class="info-item" style="grid-column:span 2"><div class="lbl">Observações gerais</div><div class="val" id="dObs">—</div></div>
+      </div>
+    </div>
+
+    <!-- PROGRESSO -->
+    <div class="section">
+      <div class="section-title">Progresso da obra</div>
+      <div class="pct-display">
+        <div class="pct-number" id="dPct">—</div>
+        <div class="pct-bar-wrap">
+          <div class="pct-label">Avanço registrado nesta visita</div>
+          <div class="pct-bar"><div class="pct-fill" id="dPctBar" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="pct-notes" id="dPctNotes" style="display:none"></div>
+    </div>
+
+    <!-- PONTOS DE ATENÇÃO -->
+    <div class="section">
+      <div class="section-title">Pontos de atenção <span id="dAttCount" style="font-size:11px;color:var(--text-tertiary);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+      <div id="dAttentionPoints"><div style="font-size:12px;color:var(--text-tertiary)">Nenhum ponto registrado</div></div>
+    </div>
+
+    <!-- MÍDIA -->
+    <div class="section">
+      <div class="section-title">Registro visual <span style="font-size:11px;color:var(--text-tertiary);font-weight:400;text-transform:none;letter-spacing:0" id="dMediaCount"></span></div>
+      <div id="dMedia"><div style="font-size:12px;color:var(--text-tertiary)">Nenhuma mídia enviada</div></div>
+    </div>
+
+    <!-- DRIVE -->
+    <div class="section" id="dDriveSection" style="display:none">
+      <div class="section-title">Materiais completos</div>
+      <a id="dDriveLink" href="#" target="_blank" class="btn btn-ghost btn-sm">📁 Abrir pasta no Google Drive ↗</a>
+    </div>
+
+    <!-- AÇÕES -->
+    <div class="section">
+      <div class="section-title">Ações</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="detailAcoes">
+        <button class="btn btn-ghost btn-sm" onclick="editarVisita()">✏ Editar</button>
+        <button class="btn btn-sm" style="background:var(--red-dim);color:var(--red)" onclick="confirmarExcluir()">✕ Excluir</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL NOVA VISITA -->
+<div class="modal-overlay" id="modalVisita">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalVisitaTitle">Nova Visita</div>
+      <button class="modal-close" onclick="closeModal('modalVisita')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="visitaId"/>
+      <div class="form-group">
+        <label class="form-label">Obra *</label>
+        <select class="form-select" id="visitaObra"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Piloto *</label>
+        <select class="form-select" id="visitaPiloto"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Data *</label>
+          <input class="form-input" id="visitaData" type="date"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Horário início</label>
+          <input class="form-input" id="visitaHorario" type="time"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observações para o piloto</label>
+        <textarea class="form-textarea" id="visitaObs" placeholder="Instruções especiais, contato no local, acesso..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalVisita')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarVisita()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PUBLICAR -->
+<div class="modal-overlay" id="modalPublicar">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">Publicar relatório</div>
+      <button class="modal-close" onclick="closeModal('modalPublicar')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem;line-height:1.6">
+        Ao publicar, o cliente receberá notificação de acesso. O relatório ficará visível no portal do cliente.<br><br>
+        <strong style="color:var(--text)">Confirma que a mídia foi enviada e o relatório está completo?</strong>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalPublicar')">Cancelar</button>
+      <button class="btn btn-primary" onclick="publicarVisita()">Publicar agora</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM EXCLUIR -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-body" style="text-align:center;padding:1.5rem">
+      <div style="font-size:32px;margin-bottom:0.75rem">⚠</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:0.5rem">Excluir visita?</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:1.25rem;line-height:1.5">O relatório, pontos de atenção e mídias desta visita serão removidos permanentemente.</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button class="btn btn-ghost" onclick="closeModal('modalConfirm')">Cancelar</button>
+        <button class="btn btn-sm" style="background:var(--red);color:white" onclick="excluirVisita()">Excluir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://zjjinojrghquzeqrdmoj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_uJmCKXdFbkU6-nSkYChkRQ_whLqPdE8';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let todasVisitas = [];
+let obras = [];
+let pilotos = [];
+let visitaSelecionada = null;
+let tabAtual = 'todas';
+
+const hoje = new Date().toISOString().split('T')[0];
+
+const weatherMap = { sunny:'☀️ Sol', partly_cloudy:'⛅ Parcialmente nublado', cloudy:'☁️ Nublado', light_wind:'🌬 Vento leve', strong_wind:'💨 Vento forte' };
+const statusMap = {
+  draft: { label:'Agendada', cls:'badge-gray', action: 'Aguardando preenchimento do piloto' },
+  awaiting_media: { label:'Aguardando revisão', cls:'badge-yellow', action: 'Relatório assinado pelo piloto — aguardando revisão e publicação' },
+  published: { label:'Publicada', cls:'badge-green', action: 'Relatório publicado e visível ao cliente' },
+};
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'ottus_login.html'; return; }
+  const { data: u } = await sb.from('users').select('*').eq('id', session.user.id).single();
+  if (!u || u.role !== 'admin') { await sb.auth.signOut(); window.location.href = 'ottus_login.html'; return; }
+  document.getElementById('userName').textContent = u.name || 'Admin';
+  document.getElementById('userAvatar').textContent = (u.name || 'A')[0].toUpperCase();
+  await Promise.all([carregarVisitas(), carregarObras(), carregarPilotos()]);
+  document.getElementById('loadingScreen').classList.add('hidden');
+}
+
+async function carregarVisitas() {
+  const { data } = await sb
+    .from('visits')
+    .select('*, sites(name, drive_folder_url, clients(company_name)), users!visits_pilot_id_fkey(name)')
+    .order('visit_date', { ascending: false });
+  todasVisitas = data || [];
+  atualizarContadores();
+  filtrar();
+}
+
+async function carregarObras() {
+  const { data } = await sb.from('sites').select('id, name').eq('status', 'active').order('name');
+  obras = data || [];
+  const sel = document.getElementById('filterObra');
+  const selModal = document.getElementById('visitaObra');
+  obras.forEach(o => {
+    sel.innerHTML += `<option value="${o.id}">${o.name}</option>`;
+    selModal.innerHTML += `<option value="${o.id}">${o.name}</option>`;
+  });
+}
+
+async function carregarPilotos() {
+  const { data } = await sb.from('users').select('id, name').in('role', ['admin', 'pilot']).eq('active', true);
+  pilotos = data || [];
+  const sel = document.getElementById('filterPiloto');
+  const selModal = document.getElementById('visitaPiloto');
+  sel.innerHTML = '<option value="">Todos os pilotos</option>';
+  selModal.innerHTML = '<option value="">Selecione o piloto...</option>';
+  pilotos.forEach(p => {
+    sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+    selModal.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+  });
+}
+
+function atualizarContadores() {
+  const pendentes = todasVisitas.filter(v => v.status !== 'published' && v.visit_date <= hoje).length;
+  const publicadas = todasVisitas.filter(v => v.status === 'published').length;
+  const proximas = todasVisitas.filter(v => v.visit_date > hoje).length;
+  document.getElementById('cntTodas').textContent = todasVisitas.length;
+  document.getElementById('cntPendentes').textContent = pendentes;
+  document.getElementById('cntPublicadas').textContent = publicadas;
+  document.getElementById('cntProximas').textContent = proximas;
+  document.getElementById('headerCount').textContent = `${todasVisitas.length} visita${todasVisitas.length !== 1 ? 's' : ''}`;
+  if (pendentes > 0) { const b = document.getElementById('badgePendentes'); b.textContent = pendentes; b.style.display = 'inline'; }
+}
+
+function setTab(tab) {
+  tabAtual = tab;
+  ['todas','pendentes','publicadas','proximas'].forEach(t => {
+    document.getElementById(`tab${t.charAt(0).toUpperCase()+t.slice(1)}`).classList.toggle('active', t === tab);
+  });
+  filtrar();
+}
+
+function filtrar() {
+  const busca = document.getElementById('searchInput').value.toLowerCase();
+  const obraId = document.getElementById('filterObra').value;
+  const pilotoId = document.getElementById('filterPiloto').value;
+
+  let lista = todasVisitas.filter(v => {
+    const matchBusca = (v.sites?.name || '').toLowerCase().includes(busca) || (v.sites?.clients?.company_name || '').toLowerCase().includes(busca);
+    const matchObra = !obraId || v.site_id === obraId;
+    const matchPiloto = !pilotoId || v.pilot_id === pilotoId;
+    return matchBusca && matchObra && matchPiloto;
+  });
+
+  if (tabAtual === 'pendentes') lista = lista.filter(v => v.status !== 'published' && v.visit_date <= hoje);
+  if (tabAtual === 'publicadas') lista = lista.filter(v => v.status === 'published');
+  if (tabAtual === 'proximas') lista = lista.filter(v => v.visit_date > hoje);
+
+  renderVisitas(lista);
+}
+
+function renderVisitas(lista) {
+  const el = document.getElementById('visitasList');
+  if (!lista.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Nenhuma visita encontrada</div><div class="empty-sub">Agende a primeira visita para começar</div><button class="btn btn-primary" onclick="openModal('modalVisita')">+ Nova Visita</button></div>`;
+    return;
+  }
+
+  // Agrupa por mês
+  const grupos = {};
+  lista.forEach(v => {
+    const d = new Date(v.visit_date + 'T00:00:00');
+    const key = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(v);
+  });
+
+  let html = '';
+  Object.entries(grupos).forEach(([mes, visitas]) => {
+    html += `<div class="timeline-month">${mes}</div>`;
+    visitas.forEach(v => {
+      const d = new Date(v.visit_date + 'T00:00:00');
+      const dia = d.getDate().toString().padStart(2, '0');
+      const semana = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+      const mesAbrev = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+      const s = statusMap[v.status] || statusMap.draft;
+      const isFutura = v.visit_date > hoje;
+      html += `
+        <div class="visit-card status-${v.status}" onclick="abrirDetalhe('${v.id}')">
+          <div class="visit-date-col">
+            <div class="visit-day">${dia}</div>
+            <div class="visit-weekday">${semana}</div>
+            <div class="visit-month-sm">${mesAbrev}</div>
+          </div>
+          <div class="visit-main">
+            <div class="visit-site-name">${v.sites?.name || '—'}</div>
+            <div class="visit-client-name">${v.sites?.clients?.company_name || '—'}</div>
+            <div class="visit-meta">
+              <span class="visit-meta-item">👤 ${v.users?.name || 'Piloto não atribuído'}</span>
+              ${v.weather ? `<span class="visit-meta-item">${weatherMap[v.weather] || v.weather}</span>` : ''}
+              ${v.start_time ? `<span class="visit-meta-item">🕐 ${v.start_time.substring(0,5)}</span>` : ''}
+            </div>
+          </div>
+          <div class="visit-right">
+            <span class="badge ${s.cls}"><span class="badge-dot"></span>${isFutura ? 'Agendada' : s.label}</span>
+            ${v.progress_pct != null ? `<div class="visit-pct">${v.progress_pct}%</div>` : ''}
+          </div>
+        </div>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+async function abrirDetalhe(id) {
+  visitaSelecionada = todasVisitas.find(v => v.id === id);
+  if (!visitaSelecionada) return;
+  const v = visitaSelecionada;
+  const d = new Date(v.visit_date + 'T00:00:00');
+  const s = statusMap[v.status] || statusMap.draft;
+  const isFutura = v.visit_date > hoje;
+
+  document.getElementById('detailSite').textContent = v.sites?.name || '—';
+  document.getElementById('detailClient').textContent = v.sites?.clients?.company_name || '—';
+  document.getElementById('detailDate').textContent = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('dPiloto').textContent = v.users?.name || '—';
+  document.getElementById('dContato').textContent = v.site_contact || '—';
+  document.getElementById('dHorario').textContent = v.start_time ? `${v.start_time.substring(0,5)}${v.end_time ? ' → ' + v.end_time.substring(0,5) : ''}` : '—';
+  document.getElementById('dClima').textContent = weatherMap[v.weather] || '—';
+  // Renderizar canteiro com badge + observações separadas
+  const notesRaw = v.general_notes || '';
+  const canteiroMatch = notesRaw.match(/^Canteiro: (Organizado|Parcialmente organizado|Desorganizado)\.?\s*/);
+  const obsEl = document.getElementById('dObs');
+  if (canteiroMatch) {
+    const canteiroVal = canteiroMatch[1];
+    const obsTexto = notesRaw.replace(canteiroMatch[0], '').trim();
+    const canteiroCor = canteiroVal === 'Organizado' ? 'var(--green)' : canteiroVal === 'Parcialmente organizado' ? 'var(--yellow)' : 'var(--red)';
+    const canteiroBg = canteiroVal === 'Organizado' ? 'var(--green-dim)' : canteiroVal === 'Parcialmente organizado' ? 'var(--yellow-dim)' : 'var(--red-dim)';
+    const canteiroEmoji = canteiroVal === 'Organizado' ? '✅' : canteiroVal === 'Parcialmente organizado' ? '⚠️' : '🚧';
+    obsEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px;background:${canteiroBg};border:0.5px solid ${canteiroCor};border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;color:${canteiroCor};margin-bottom:${obsTexto ? '6px' : '0'}">${canteiroEmoji} ${canteiroVal}</span>${obsTexto ? `<div style="margin-top:4px;font-size:13px;color:var(--text-secondary)">${obsTexto}</div>` : ''}`;
+  } else {
+    obsEl.textContent = notesRaw || '—';
+  }
+
+  // Status bar
+  document.getElementById('statusLabel').innerHTML = `<span class="badge ${s.cls}"><span class="badge-dot"></span>${isFutura ? 'Agendada' : s.label}</span> <span style="margin-left:6px;font-size:11px">${s.action}</span>`;
+
+  // Botões de ação conforme status
+  let acoes = '';
+  if (v.status === 'awaiting_media') acoes = `<button class="btn btn-primary btn-sm" onclick="openModal('modalPublicar')">▶ Publicar</button>`;
+  if (v.status === 'draft') acoes = `<button class="btn btn-ghost btn-sm" onclick="marcarAguardandoMidia()">📤 Marcar como preenchido</button>`;
+  document.getElementById('statusActions').innerHTML = acoes;
+
+  // Progresso
+  if (v.progress_pct != null) {
+    document.getElementById('dPct').textContent = `${v.progress_pct}%`;
+    document.getElementById('dPctBar').style.width = `${v.progress_pct}%`;
+    if (v.progress_notes) {
+      document.getElementById('dPctNotes').textContent = v.progress_notes;
+      document.getElementById('dPctNotes').style.display = 'block';
+    }
+  } else {
+    document.getElementById('dPct').textContent = '—';
+    document.getElementById('dPctBar').style.width = '0%';
+  }
+
+  // Pontos de atenção
+  const { data: points } = await sb.from('attention_points').select('*').eq('visit_id', id).order('order_index');
+  const attEl = document.getElementById('dAttentionPoints');
+  document.getElementById('dAttCount').textContent = points?.length ? `— ${points.length} ponto${points.length !== 1 ? 's' : ''}` : '';
+  if (!points?.length) {
+    attEl.innerHTML = `<div style="font-size:12px;color:var(--text-tertiary)">Nenhum ponto registrado</div>`;
+  } else {
+    attEl.innerHTML = points.map(p => {
+      const desc = p.description || '';
+      let urgLabel = '', urgColor = 'var(--text-tertiary)', urgBg = 'rgba(255,255,255,0.05)';
+      let descClean = desc;
+      if (desc.startsWith('[CRÍTICO] ')) {
+        urgLabel = '🔴 Crítico'; urgColor = 'var(--red)'; urgBg = 'var(--red-dim)';
+        descClean = desc.replace('[CRÍTICO] ', '');
+      } else if (desc.startsWith('[ATENÇÃO] ')) {
+        urgLabel = '⚠ Atenção'; urgColor = 'var(--yellow)'; urgBg = 'var(--yellow-dim)';
+        descClean = desc.replace('[ATENÇÃO] ', '');
+      } else {
+        urgLabel = '● Normal';
+      }
+      return `<div class="attention-item">
+        <div class="attention-header">
+          <span class="attention-num">Ponto ${p.order_index}</span>
+          <span style="font-size:11px;font-weight:600;color:${urgColor};background:${urgBg};padding:1px 8px;border-radius:20px">${urgLabel}</span>
+          <span class="attention-location">${p.location || ''}</span>
+        </div>
+        <div class="attention-desc">${descClean}</div>
+        ${p.image_url ? `<img class="attention-img" src="${p.image_url}" alt="Ponto ${p.order_index}" style="cursor:pointer" onclick="window.open('${p.image_url}','_blank')"/>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // Mídia
+  const { data: media } = await sb.from('media').select('*').eq('visit_id', id).order('order_index');
+  const mediaEl = document.getElementById('dMedia');
+  document.getElementById('dMediaCount').textContent = media?.length ? `— ${media.length} arquivo${media.length !== 1 ? 's' : ''}` : '';
+  if (!media?.length) {
+    mediaEl.innerHTML = `<div style="font-size:12px;color:var(--text-tertiary)">Nenhuma mídia enviada</div>`;
+  } else {
+    const typeLabel = { photo_external:'📸 Ext', photo_internal:'📸 Int', video_external:'🎬 Ext', video_fpv:'🎬 FPV', tour_360:'360°', timelapse:'⏱' };
+    mediaEl.innerHTML = `<div class="media-grid">` + media.map(m => `
+      <div class="media-thumb" onclick="window.open('${m.url}','_blank')">
+        ${m.thumbnail_url ? `<img src="${m.thumbnail_url}" alt=""/>` : '🎬'}
+        <span class="media-type-badge">${typeLabel[m.type] || m.type}</span>
+      </div>`).join('') + `</div>`;
+  }
+
+  // Drive
+  const drive = v.sites?.drive_folder_url;
+  if (drive) {
+    document.getElementById('dDriveSection').style.display = 'block';
+    document.getElementById('dDriveLink').href = drive;
+  } else {
+    document.getElementById('dDriveSection').style.display = 'none';
+  }
+
+  document.getElementById('detailOverlay').classList.add('open');
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('open');
+  document.getElementById('detailPanel').classList.remove('open');
+}
+
+async function marcarAguardandoMidia() {
+  if (!visitaSelecionada) return;
+  const { error } = await sb.from('visits').update({ status: 'awaiting_media' }).eq('id', visitaSelecionada.id);
+  if (error) { toast('Erro ao atualizar', 'error'); return; }
+  toast('Status atualizado — aguardando mídia', 'success');
+  await carregarVisitas();
+  await abrirDetalhe(visitaSelecionada.id);
+}
+
+async function publicarVisita() {
+  if (!visitaSelecionada) return;
+  const { error } = await sb.from('visits').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', visitaSelecionada.id);
+  if (error) { toast('Erro ao publicar', 'error'); return; }
+  toast('Relatório publicado! Cliente notificado.', 'success');
+  closeModal('modalPublicar');
+  await carregarVisitas();
+  await abrirDetalhe(visitaSelecionada.id);
+}
+
+async function salvarVisita() {
+  const id = document.getElementById('visitaId').value;
+  const siteId = document.getElementById('visitaObra').value;
+  const pilotoId = document.getElementById('visitaPiloto').value;
+  const data = document.getElementById('visitaData').value;
+  if (!siteId) { toast('Selecione a obra', 'error'); return; }
+  if (!pilotoId) { toast('Selecione o piloto', 'error'); return; }
+  if (!data) { toast('Informe a data', 'error'); return; }
+
+  const payload = {
+    site_id: siteId,
+    pilot_id: pilotoId,
+    visit_date: data,
+    start_time: document.getElementById('visitaHorario').value || null,
+    general_notes: document.getElementById('visitaObs').value.trim() || null,
+  };
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from('visits').update(payload).eq('id', id));
+  } else {
+    ({ error } = await sb.from('visits').insert({ ...payload, status: 'draft' }));
+    if (!error) await sb.from('sites').update({ next_visit_date: data }).eq('id', siteId);
+  }
+
+  if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+  if (id) {
+    // Edição — toast simples
+    toast('Visita atualizada!', 'success');
+    closeModal('modalVisita');
+    limparModal();
+  } else {
+    // Nova visita — mostrar modal WhatsApp se houver observações
+    closeModal('modalVisita');
+    const obs = document.getElementById('visitaObs').value.trim();
+    limparModal();
+    await carregarVisitas();
+    if (obs) {
+      // Buscar telefone do piloto para o link
+      const { data: pilotoData } = await sb.from('users').select('name, phone').eq('id', pilotoId).maybeSingle();
+      const nomeObra = document.getElementById('filterObra').options[0]?.text || '';
+      const dataBr = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      const obraEl = document.getElementById('filterObra');
+      const obraNome = obras.find(o => o.id === siteId)?.name || 'obra';
+      const msg = encodeURIComponent(`📋 *OTTUS — Visita agendada*
+
+Obra: ${obraNome}
+Data: ${dataBr}
+
+📌 *Briefing:*
+${obs}
+
+_App OTTUS_`);
+      const phone = pilotoData?.phone?.replace(/\D/g,'') || '';
+      const waUrl = phone ? `https://wa.me/55${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+      mostrarModalWhatsApp(pilotoData?.name || 'piloto', waUrl);
+      return;
+    }
+    toast('Visita agendada!', 'success');
+  }
+  await carregarVisitas();
+}
+
+function mostrarModalWhatsApp(nomePiloto, waUrl) {
+  document.getElementById('waMsgPiloto').textContent = nomePiloto;
+  document.getElementById('waBtnEnviar').onclick = () => { window.open(waUrl, '_blank'); fecharModalWA(); };
+  document.getElementById('modalWhatsApp').classList.add('open');
+}
+
+function fecharModalWA() {
+  document.getElementById('modalWhatsApp').classList.remove('open');
+}
+
+function limparModal() {
+  ['visitaId','visitaObs'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('visitaData').value = '';
+  document.getElementById('visitaHorario').value = '';
+  document.getElementById('modalVisitaTitle').textContent = 'Nova Visita';
+}
+
+function editarVisita() {
+  if (!visitaSelecionada) return;
+  const v = visitaSelecionada;
+  document.getElementById('visitaId').value = v.id;
+  document.getElementById('visitaObra').value = v.site_id;
+  document.getElementById('visitaPiloto').value = v.pilot_id || '';
+  document.getElementById('visitaData').value = v.visit_date;
+  document.getElementById('visitaHorario').value = v.start_time || '';
+  document.getElementById('visitaObs').value = v.general_notes || '';
+  document.getElementById('modalVisitaTitle').textContent = 'Editar Visita';
+  openModal('modalVisita');
+}
+
+function confirmarExcluir() { openModal('modalConfirm'); }
+async function excluirVisita() {
+  if (!visitaSelecionada) return;
+  const { error } = await sb.from('visits').delete().eq('id', visitaSelecionada.id);
+  if (error) { toast('Erro ao excluir', 'error'); return; }
+  toast('Visita excluída', 'success');
+  closeModal('modalConfirm');
+  closeDetail();
+  await carregarVisitas();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }); });
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebarOverlay').classList.toggle('open'); }
+function toast(msg, type = 'success') { const el = document.getElementById('toast'); el.className = `toast toast-${type} show`; el.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`; setTimeout(() => el.classList.remove('show'), 3500); }
+async function logout() { await sb.auth.signOut(); window.location.href = 'ottus_login.html'; }
+
+init();
+</script>
+
+<!-- MODAL WHATSAPP -->
+<div class="modal-overlay" id="modalWhatsApp">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">📲 Enviar briefing ao piloto</div>
+      <button class="modal-close" onclick="fecharModalWA()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:1rem">
+        Você adicionou observações para <strong id="waMsgPiloto">o piloto</strong>. Deseja enviar o briefing agora pelo WhatsApp?
+      </p>
+      <div style="background:var(--green-dim);border:0.5px solid rgba(34,197,94,0.25);border-radius:var(--radius-sm);padding:0.75rem 1rem;font-size:12px;color:var(--green)">
+        ✓ Inclui nome da obra, data e as observações que você digitou
+      </div>
+    </div>
+    <div class="modal-footer" style="gap:8px">
+      <button class="btn btn-ghost" onclick="fecharModalWA()">Pular</button>
+      <button class="btn btn-primary" id="waBtnEnviar" style="background:#25d366">📲 Abrir WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

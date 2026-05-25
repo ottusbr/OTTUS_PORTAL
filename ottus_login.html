@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTTUS — Login 10/10</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --orange: #f1600e;
+    --orange-dim: rgba(241,96,14,0.1);
+    --navy: #060f1a;
+    --navy-card: #0b1929;
+    --text: #ffffff;
+    --text-secondary: rgba(255,255,255,0.5);
+    --text-tertiary: rgba(255,255,255,0.25);
+    --border: rgba(255,255,255,0.07);
+  }
+
+  body {
+    background: var(--navy);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Fundo atmosférico */
+  .bg-glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bg-glow::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(241,96,14,0.07) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .bg-glow::after {
+    content: '';
+    position: absolute;
+    bottom: -20%;
+    right: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(ellipse, rgba(241,96,14,0.04) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  /* Linhas de grade sutis */
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 48px 48px;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 380px;
+    padding: 2.5rem;
+    background: var(--navy-card);
+    border: 0.5px solid rgba(255,255,255,0.09);
+    border-radius: 20px;
+    box-shadow:
+      0 0 0 0.5px rgba(241,96,14,0.08),
+      0 40px 80px rgba(0,0,0,0.6),
+      0 0 120px rgba(241,96,14,0.04);
+    animation: fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Linha laranja topo do card */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 2.5rem; right: 2.5rem;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(241,96,14,0.6), transparent);
+    border-radius: 1px;
+  }
+
+  /* Logo */
+  .logo-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 2rem;
+    animation: fadeUp 0.5s 0.05s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .logo-sub {
+    font-family: 'Syne', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    color: var(--orange);
+    text-transform: uppercase;
+  }
+
+  /* Título */
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+    animation: fadeUp 0.5s 0.1s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .card-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    animation: fadeUp 0.5s 0.15s cubic-bezier(0.22,1,0.36,1) both;
+  }
+
+  /* Form */
+  .form-group {
+    margin-bottom: 1rem;
+    animation: fadeUp 0.5s 0.2s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .form-group:nth-child(2) { animation-delay: 0.25s; }
+
+  .form-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 0.5rem;
+  }
+
+  .input-wrap {
+    position: relative;
+  }
+  .input-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-tertiary);
+    font-size: 14px;
+    pointer-events: none;
+    transition: color 0.2s;
+  }
+  .form-input {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  .form-input:focus {
+    border-color: rgba(241,96,14,0.5);
+    background: rgba(241,96,14,0.04);
+    box-shadow: 0 0 0 3px rgba(241,96,14,0.08);
+  }
+  .form-input:focus + .input-icon,
+  .input-wrap:focus-within .input-icon {
+    color: var(--orange);
+  }
+  .form-input::placeholder { color: rgba(255,255,255,0.18); }
+
+  .toggle-pass {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 0;
+    transition: color 0.2s;
+  }
+  .toggle-pass:hover { color: var(--text-secondary); }
+
+  /* Esqueci senha */
+  .forgot-wrap {
+    text-align: right;
+    margin-top: 0.5rem;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.5s 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .forgot-link {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .forgot-link:hover { color: var(--orange); }
+
+  /* Botão */
+  .btn-enter {
+    width: 100%;
+    background: var(--orange);
+    border: none;
+    border-radius: 10px;
+    padding: 0.85rem;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Syne', sans-serif;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s;
+    animation: fadeUp 0.5s 0.35s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .btn-enter::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .btn-enter:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(241,96,14,0.4);
+  }
+  .btn-enter:active { transform: scale(0.98); }
+
+  /* Divisor */
+  .divider {
+    height: 0.5px;
+    background: var(--border);
+    margin: 1.5rem 0 1rem;
+    animation: fadeUp 0.5s 0.4s cubic-bezier(0.22,1,0.36,1) both;
+  }
+
+  /* Rodapé */
+  .card-footer {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.6;
+    animation: fadeUp 0.5s 0.45s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .card-footer a {
+    color: var(--orange);
+    text-decoration: none;
+  }
+  .card-footer a:hover { text-decoration: underline; }
+
+  /* Role badge */
+  .role-badge {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    background: var(--orange-dim);
+    border: 0.5px solid rgba(241,96,14,0.25);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: var(--orange);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  /* Alert */
+  .alert {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 1rem;
+  }
+  .alert-error { background: rgba(239,68,68,0.1); border: 0.5px solid rgba(239,68,68,0.25); color: #fca5a5; }
+  .alert-success { background: rgba(34,197,94,0.1); border: 0.5px solid rgba(34,197,94,0.25); color: #86efac; }
+  .alert.show { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+<div class="bg-grid"></div>
+
+<div class="card">
+
+  <div class="logo-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="97 394 835 245" style="width:125px;height:auto;display:block">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-1, .cls-2 {
+        fill-rule: evenodd;
+      }
+
+      .cls-2 {
+        fill: #f1600e;
+      }
+    </style>
+  </defs>
+  <path id="Forma_319_1" data-name="Forma 319 1" class="cls-1" d="M863.922,495.075c-2.727-1.142-32.1-11.141-36.968-19.989s-1.83-29.13,23.979-29.983c20.615-.681,29.5,9.129,38.967,15.991,1.385,1,20.576-27.547,22.98-30.982-54.52-43.7-130.544-21.708-130.888,34.98,0.466,41.317,34.009,52.069,59.971,65.193,6,2.653,36.292,8.934,35.947,32.751,1.312,22.712-24.948,28.058-46.96,22.987-11.926-2.508-32.971-18.989-32.971-18.989S774.418,593.459,773,595.018c7.692,9.889,37.3,31.8,65.944,30.982,32.159-.186,78.638-11.2,79.931-63.964C921.375,519.806,885.307,503.213,863.922,495.075Z"/>
+  <path id="Forma_318_1" data-name="Forma 318 1" class="cls-1" d="M607.031,409h41.991s1,143.378,1,146c-0.009,35.428,31.994,32,31.994,32s32.807,2.926,31.993-32V409H757s-0.213,133.3,0,151c-4.9,69.083-73.985,67-73.985,67s-73.142.7-75.984-67C606.966,543.039,607.031,409,607.031,409Z"/>
+  <path id="Elipse_1" data-name="Elipse 1" class="cls-1" d="M219.055,403.964A112.358,112.358,0,1,1,106.7,516.321,112.358,112.358,0,0,1,219.055,403.964ZM219.005,445c35.9,0,65.007,32.239,65.007,72.008s-29.1,72.007-65.007,72.007S154,556.774,154,517.006,183.1,445,219.005,445Z"/>
+  <path id="Forma_317_1" data-name="Forma 317 1" class="cls-2" d="M337,406H583v41H530V624H486V447H429V624H385V447H337V406Z"/>
+</svg>
+    <span class="logo-sub">Portal de Obras</span>
+  </div>
+
+  <div class="role-badge" id="roleBadge">
+    <span id="roleIcon">●</span>
+    <span id="roleText">Carregando...</span>
+  </div>
+
+  <div class="alert alert-error" id="alertError">
+    <span>⚠</span>
+    <span id="alertErrorText">E-mail ou senha incorretos.</span>
+  </div>
+  <div class="alert alert-success" id="alertSuccess">
+    <span>✓</span>
+    <span id="alertSuccessText">E-mail de recuperação enviado.</span>
+  </div>
+
+  <div id="mainForm">
+    <div class="card-title">Bem-vindo</div>
+    <div class="card-subtitle">Acesse o portal de acompanhamento de obras</div>
+
+    <div class="form-group">
+      <label class="form-label">E-mail</label>
+      <div class="input-wrap">
+        <input class="form-input" id="email" type="email" placeholder="seu@email.com" autocomplete="email"/>
+        <span class="input-icon">✉</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Senha</label>
+      <div class="input-wrap">
+        <input class="form-input" id="password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+        <span class="input-icon">🔒</span>
+        <button class="toggle-pass" type="button" onclick="togglePass()" id="togglePassBtn">👁</button>
+      </div>
+    </div>
+
+    <div class="forgot-wrap">
+      <a href="#" class="forgot-link" onclick="showForgot(); return false;">Esqueci minha senha</a>
+    </div>
+
+    <button class="btn-enter" id="btnEntrar" onclick="entrar()">Entrar</button>
+  </div>
+
+  <div id="forgotForm" style="display:none">
+    <div class="card-title" style="font-size:18px;margin-bottom:0.25rem">Recuperar senha</div>
+    <div class="card-subtitle">Informe seu e-mail para receber o link</div>
+    <div class="form-group">
+      <label class="form-label">E-mail</label>
+      <div class="input-wrap">
+        <input class="form-input" id="forgotEmail" type="email" placeholder="seu@email.com"/>
+        <span class="input-icon">✉</span>
+      </div>
+    </div>
+    <button class="btn-enter" onclick="enviarRecuperacao()">Enviar link</button>
+    <div style="text-align:center;margin-top:1rem">
+      <a href="#" class="forgot-link" onclick="showLogin(); return false;">← Voltar ao login</a>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="card-footer">
+    Acesso exclusivo para clientes e equipe OTTUS.<br>
+    Problemas? <a href="mailto:contato@ottus.com.br">Fale conosco</a>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL = 'https://zjjinojrghquzeqrdmoj.supabase.co';
+const SB_KEY = 'sb_publishable_uJmCKXdFbkU6-nSkYChkRQ_whLqPdE8';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+function togglePass() {
+  const input = document.getElementById('password');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+function showAlert(type, msg) {
+  document.getElementById('alertError').classList.remove('show');
+  document.getElementById('alertSuccess').classList.remove('show');
+  if (type === 'error') {
+    document.getElementById('alertErrorText').textContent = msg;
+    document.getElementById('alertError').classList.add('show');
+  } else {
+    document.getElementById('alertSuccessText').textContent = msg;
+    document.getElementById('alertSuccess').classList.add('show');
+  }
+}
+
+async function entrar() {
+  const email = document.getElementById('email').value.trim();
+  const senha = document.getElementById('password').value;
+  const btn = document.getElementById('btnEntrar');
+
+  if (!email || !senha) { showAlert('error', 'Preencha e-mail e senha.'); return; }
+
+  btn.textContent = 'Entrando...';
+  btn.disabled = true;
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
+
+  if (error) {
+    showAlert('error', 'E-mail ou senha incorretos. Tente novamente.');
+    btn.textContent = 'Entrar';
+    btn.disabled = false;
+    return;
+  }
+
+  const { data: u } = await sb.from('users').select('role, name').eq('id', data.user.id).single();
+  const role = u?.role;
+
+  if (role === 'admin' || role === 'pilot') {
+    window.location.href = role === 'admin' ? 'ottus_dashboard.html' : 'ottus_piloto.html';
+  } else if (role === 'client_manager' || role === 'client_site') {
+    window.location.href = 'ottus_cliente.html';
+  } else {
+    showAlert('error', 'Perfil sem acesso configurado.');
+    btn.textContent = 'Entrar';
+    btn.disabled = false;
+  }
+}
+
+function showForgot() {
+  document.getElementById('mainForm').style.display = 'none';
+  document.getElementById('forgotForm').style.display = 'block';
+}
+
+function showLogin() {
+  document.getElementById('forgotForm').style.display = 'none';
+  document.getElementById('mainForm').style.display = 'block';
+}
+
+async function enviarRecuperacao() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if (!email) { showAlert('error', 'Informe o e-mail.'); return; }
+  await sb.auth.resetPasswordForEmail(email);
+  showAlert('success', 'E-mail de recuperação enviado.');
+  setTimeout(showLogin, 2000);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') entrar();
+});
+
+// Verificar sessão ativa
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    const { data: u } = await sb.from('users').select('role').eq('id', session.user.id).single();
+    const role = u?.role;
+    if (role === 'admin') window.location.href = 'ottus_dashboard.html';
+    else if (role === 'pilot') window.location.href = 'ottus_piloto.html';
+    else if (role?.startsWith('client')) window.location.href = 'ottus_cliente.html';
+  }
+})();
+</script>
+</body>
+</html>

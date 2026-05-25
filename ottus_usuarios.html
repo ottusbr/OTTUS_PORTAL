@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTTUS Portal — Usuários</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #091c2b;
+    --navy-light: #0d2438;
+    --navy-card: #0f2a3d;
+    --orange: #d85a30;
+    --orange-hover: #c04e28;
+    --orange-dim: rgba(216,90,48,0.12);
+    --orange-border: rgba(216,90,48,0.25);
+    --text: #ffffff;
+    --text-secondary: rgba(255,255,255,0.5);
+    --text-tertiary: rgba(255,255,255,0.3);
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.12);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --sidebar-w: 220px;
+    --header-h: 56px;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --panel-w: 320px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ─── LAYOUT ─── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--navy-light);
+    border-right: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+    transition: transform 0.25s ease;
+  }
+  .sidebar-logo {
+    padding: 1.25rem 1rem;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-tt svg { width: 28px; height: 28px; }
+  .logo-name { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; }
+  .logo-sub { font-size: 9px; color: var(--orange); letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .sidebar-section {
+    padding: 0.75rem 0.75rem 0.25rem;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.6rem 0.75rem;
+    margin: 1px 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-size: 13px;
+    text-decoration: none;
+    border: none;
+    background: none;
+    width: calc(100% - 1rem);
+    text-align: left;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-item.active { background: var(--orange-dim); color: var(--orange); }
+  .nav-item .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto;
+    background: var(--orange);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 20px;
+    padding: 1px 6px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  .sidebar-bottom {
+    margin-top: auto;
+    padding: 0.75rem;
+    border-top: 0.5px solid var(--border);
+  }
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .user-row:hover { background: rgba(255,255,255,0.05); }
+  .user-avatar {
+    width: 30px; height: 30px;
+    background: var(--orange-dim);
+    border: 0.5px solid var(--orange-border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--orange);
+    flex-shrink: 0;
+  }
+  .user-name { font-size: 12px; font-weight: 500; }
+  .user-role { font-size: 10px; color: var(--text-secondary); }
+  .logout-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .logout-btn:hover { color: var(--red); }
+
+  /* ─── MAIN ─── */
+  .main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    transition: margin-right 0.25s;
+  }
+  .main.panel-open { margin-right: var(--panel-w); }
+
+  /* ─── HEADER ─── */
+  .header {
+    height: var(--header-h);
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    background: var(--navy);
+    z-index: 50;
+  }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--text-secondary); margin-left: 4px; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--orange); color: white; }
+  .btn-primary:hover { background: var(--orange-hover); }
+  .btn-ghost {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+    border: 0.5px solid var(--border);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .btn-danger { background: var(--red-dim); color: var(--red); border: 0.5px solid rgba(239,68,68,0.2); }
+  .btn-danger:hover { background: rgba(239,68,68,0.2); }
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  /* ─── CONTENT ─── */
+  .content { padding: 1.5rem; flex: 1; }
+
+  /* ─── TOOLBAR ─── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 180px;
+    max-width: 340px;
+  }
+  .search-wrap .s-icon {
+    position: absolute;
+    left: 10px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-tertiary);
+    font-size: 13px;
+    pointer-events: none;
+  }
+  .search-input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.75rem 0.55rem 2rem;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--orange); }
+  .search-input::placeholder { color: var(--text-tertiary); }
+
+  .filter-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .filter-chip {
+    padding: 0.4rem 0.75rem;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 0.5px solid var(--border);
+    background: none;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .filter-chip:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .filter-chip.active { background: var(--orange-dim); border-color: var(--orange-border); color: var(--orange); }
+
+  .toolbar-right { margin-left: auto; display: flex; gap: 0.5rem; }
+
+  /* ─── USERS TABLE ─── */
+  .table-wrap {
+    background: var(--navy-card);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .table-header {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.2fr 1fr 80px;
+    padding: 0.6rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    gap: 0.75rem;
+  }
+  .th {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .user-row-item {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.2fr 1fr 80px;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .user-row-item:last-child { border-bottom: none; }
+  .user-row-item:hover { background: rgba(255,255,255,0.03); }
+  .user-row-item.selected { background: var(--orange-dim); }
+
+  .user-cell-name {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .avatar-sm {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .avatar-admin { background: var(--orange-dim); color: var(--orange); border: 0.5px solid var(--orange-border); }
+  .avatar-pilot { background: var(--blue-dim); color: var(--blue); border: 0.5px solid rgba(59,130,246,0.25); }
+  .avatar-client { background: var(--green-dim); color: var(--green); border: 0.5px solid rgba(34,197,94,0.25); }
+  .avatar-default { background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 0.5px solid var(--border); }
+
+  .uname { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .uphone { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+  .uemail { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ─── BADGE ─── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-orange { background: var(--orange-dim); color: var(--orange); }
+  .badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+  .badge-gray { background: rgba(255,255,255,0.06); color: var(--text-tertiary); }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  .row-actions { display: flex; justify-content: flex-end; }
+  .icon-btn {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+  /* ─── EMPTY ─── */
+  .table-empty {
+    padding: 3rem 1.25rem;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 13px;
+  }
+  .table-empty .empty-icon { font-size: 28px; margin-bottom: 0.5rem; }
+
+  /* ─── SIDE PANEL ─── */
+  .side-panel {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: var(--panel-w);
+    background: var(--navy-light);
+    border-left: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 80;
+    overflow-y: auto;
+  }
+  .side-panel.open { transform: translateX(0); }
+
+  .panel-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--navy-light);
+    z-index: 2;
+  }
+  .panel-title { font-size: 14px; font-weight: 600; }
+  .panel-close {
+    background: none; border: none;
+    color: var(--text-secondary);
+    cursor: pointer; font-size: 18px;
+    padding: 2px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .panel-close:hover { color: var(--text); }
+
+  .panel-body { padding: 1.25rem; flex: 1; }
+
+  .panel-avatar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .avatar-lg {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700;
+    text-transform: uppercase;
+  }
+  .panel-user-name { font-size: 16px; font-weight: 600; }
+  .panel-user-email { font-size: 12px; color: var(--text-secondary); }
+
+  .info-block { margin-bottom: 1.25rem; }
+  .info-block-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 0.6rem;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 0.5px solid var(--border);
+    gap: 0.5rem;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { font-size: 12px; color: var(--text-secondary); }
+  .info-value { font-size: 12px; font-weight: 500; text-align: right; }
+
+  .panel-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 0.5px solid var(--border);
+  }
+  .panel-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 0.25rem;
+  }
+
+  /* ─── MODAL ─── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--navy-light);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close {
+    background: none; border: none;
+    color: var(--text-secondary);
+    cursor: pointer; font-size: 20px;
+    padding: 2px;
+    transition: color 0.15s;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 1.25rem; }
+  .modal-footer {
+    padding: 1rem 1.25rem;
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ─── FORM ─── */
+  .form-group { margin-bottom: 1rem; }
+  .form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .form-input, .form-select, .form-textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 0.5px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--orange); }
+  .form-input::placeholder { color: rgba(255,255,255,0.2); }
+  .form-select option { background: var(--navy-light); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .form-hint {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 0.35rem;
+  }
+
+  /* ─── ALERT ─── */
+  .alert {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    line-height: 1.5;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .alert-yellow { background: var(--yellow-dim); border: 0.5px solid rgba(245,158,11,0.2); color: var(--yellow); }
+  .alert-blue { background: var(--blue-dim); border: 0.5px solid rgba(59,130,246,0.2); color: #93c5fd; }
+
+  /* ─── LOADING ─── */
+  .loading-screen {
+    position: fixed; inset: 0;
+    background: var(--navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .loading-screen.hidden { display: none; }
+  .spin {
+    width: 32px; height: 32px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: var(--orange);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── TOAST ─── */
+  .toast {
+    position: fixed;
+    bottom: 1.5rem; right: 1.5rem;
+    background: var(--navy-light);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.25s;
+    z-index: 300;
+    max-width: 320px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-success { border-left: 3px solid var(--green); }
+  .toast-error { border-left: 3px solid var(--red); }
+
+  /* ─── DIVIDER ─── */
+  .divider { height: 0.5px; background: var(--border); margin: 1rem 0; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .table-header, .user-row-item {
+      grid-template-columns: 2fr 1.5fr 1fr 80px;
+    }
+    .th:nth-child(2), .user-row-item > *:nth-child(2) { display: none; }
+  }
+  @media (max-width: 640px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .main.panel-open { margin-right: 0; }
+    .menu-toggle { display: block; }
+    .content { padding: 1rem; }
+    .table-header, .user-row-item {
+      grid-template-columns: 1fr 1fr 80px;
+    }
+    .th:nth-child(2), .user-row-item > *:nth-child(2),
+    .th:nth-child(3), .user-row-item > *:nth-child(3) { display: none; }
+    .side-panel { width: 100%; }
+  }
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+  }
+  .sidebar-overlay.open { display: block; }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <svg width="32" height="32" viewBox="0 0 100 100"><path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/></svg>
+  <div class="spin"></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-tt">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 15H90V30H62V85H52V30H38V85H28V30H10V15Z" fill="#d85a30"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">OTTUS</div>
+        <div class="logo-sub">Portal de Obras</div>
+      </div>
+    </div>
+
+    <div style="overflow-y:auto;flex:1">
+      <div class="sidebar-section">Principal</div>
+      <button class="nav-item" onclick="window.location.href='ottus_dashboard.html'">
+        <span class="nav-icon">⊞</span> Dashboard
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_obras.html'">
+        <span class="nav-icon">🏗</span> Obras
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_clientes.html'">
+        <span class="nav-icon">🏢</span> Clientes
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_visitas.html'">
+        <span class="nav-icon">📋</span> Visitas
+      </button>
+
+      <div class="sidebar-section">Operacional</div>
+      <button class="nav-item" onclick="window.location.href='ottus_solicitacoes.html'">
+        <span class="nav-icon">📅</span> Solicitações
+      </button>
+      <button class="nav-item active" onclick="window.location.href='ottus_usuarios.html'">
+        <span class="nav-icon">👤</span> Usuários
+      </button>
+      <button class="nav-item" onclick="window.location.href='ottus_servicos.html'">
+        <span class="nav-icon">⚡</span> Serviços
+      </button>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="user-row">
+        <div class="user-avatar" id="userAvatar">I</div>
+        <div>
+          <div class="user-name" id="userName">Carregando...</div>
+          <div class="user-role">Administrador</div>
+        </div>
+        <button class="logout-btn" onclick="logout()" title="Sair">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main" id="mainWrap">
+
+    <!-- HEADER -->
+    <header class="header">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+      <div>
+        <span class="header-title">Usuários</span>
+        <span class="header-sub" id="headerCount"></span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openModal('modalNovoUsuario')">+ Novo Usuário</button>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- TOOLBAR -->
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="s-icon">🔍</span>
+          <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nome ou email..." oninput="aplicarFiltros()">
+        </div>
+
+        <div class="filter-group">
+          <button class="filter-chip active" data-filter="todos" onclick="setFiltroRole(this)">Todos</button>
+          <button class="filter-chip" data-filter="admin" onclick="setFiltroRole(this)">Admin</button>
+          <button class="filter-chip" data-filter="pilot" onclick="setFiltroRole(this)">Piloto</button>
+          <button class="filter-chip" data-filter="client_manager" onclick="setFiltroRole(this)">Ger. Cliente</button>
+          <button class="filter-chip" data-filter="client_site" onclick="setFiltroRole(this)">Cliente Obra</button>
+        </div>
+
+        <div class="filter-group" style="margin-left:auto">
+          <button class="filter-chip active" data-status="todos" onclick="setFiltroStatus(this)">Ativos</button>
+          <button class="filter-chip" data-status="inativos" onclick="setFiltroStatus(this)">Inativos</button>
+          <button class="filter-chip" data-status="all" onclick="setFiltroStatus(this)">Todos</button>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="th">Usuário</div>
+          <div class="th">Email</div>
+          <div class="th">Perfil</div>
+          <div class="th">Status</div>
+          <div class="th" style="text-align:right">Ações</div>
+        </div>
+        <div id="listaUsuarios">
+          <div class="table-empty">
+            <div class="empty-icon">👤</div>
+            Carregando usuários...
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <!-- SIDE PANEL -->
+  <aside class="side-panel" id="sidePanel">
+    <div class="panel-header">
+      <span class="panel-title">Detalhes do Usuário</span>
+      <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panelBody">
+      <!-- preenchido via JS -->
+    </div>
+  </aside>
+
+</div><!-- /layout -->
+
+<!-- MODAL: NOVO USUÁRIO -->
+<div class="modal-overlay" id="modalNovoUsuario">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Novo Usuário</span>
+      <button class="modal-close" onclick="closeModal('modalNovoUsuario')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="alert alert-yellow">
+        ⚠ Criação de usuários requer acesso admin ao Supabase Auth. Siga o fluxo abaixo para criar e depois registrar o usuário no portal.
+      </div>
+
+      <div class="alert alert-blue">
+        📋 <span><strong>Como criar:</strong> Acesse <em>Supabase → Authentication → Users → Invite user</em>, informe o email. Depois volte aqui para registrar o perfil na tabela <em>users</em>.</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="form-group">
+        <label class="form-label">UUID do usuário *</label>
+        <input type="text" class="form-input" id="novoUUID" placeholder="Cole o UUID do Supabase Auth aqui">
+        <div class="form-hint">Supabase → Authentication → Users → clique no usuário → copie o UUID</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nome completo *</label>
+          <input type="text" class="form-input" id="novoNome" placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input type="text" class="form-input" id="novoPhone" placeholder="(15) 99999-9999">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email (referência)</label>
+        <input type="email" class="form-input" id="novoEmail" placeholder="email@empresa.com">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Perfil *</label>
+          <select class="form-select" id="novoRole" onchange="toggleClienteSelect()">
+            <option value="admin">Admin</option>
+            <option value="pilot">Piloto</option>
+            <option value="client_manager">Ger. Cliente</option>
+            <option value="client_site">Cliente Obra</option>
+          </select>
+        </div>
+        <div class="form-group" id="clienteSelectWrap" style="display:none">
+          <label class="form-label">Cliente vinculado *</label>
+          <select class="form-select" id="novoClienteId">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalNovoUsuario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="registrarUsuario()">Registrar Usuário</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EDITAR USUÁRIO -->
+<div class="modal-overlay" id="modalEditarUsuario">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Editar Usuário</span>
+      <button class="modal-close" onclick="closeModal('modalEditarUsuario')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editarId">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nome completo *</label>
+          <input type="text" class="form-input" id="editarNome" placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input type="text" class="form-input" id="editarPhone" placeholder="(15) 99999-9999">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Perfil *</label>
+          <select class="form-select" id="editarRole" onchange="toggleEditarClienteSelect()">
+            <option value="admin">Admin</option>
+            <option value="pilot">Piloto</option>
+            <option value="client_manager">Ger. Cliente</option>
+            <option value="client_site">Cliente Obra</option>
+          </select>
+        </div>
+        <div class="form-group" id="editarClienteWrap" style="display:none">
+          <label class="form-label">Cliente vinculado</label>
+          <select class="form-select" id="editarClienteId">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SUPABASE ───
+const SB_URL = 'https://zjjinojrghquzeqrdmoj.supabase.co';
+const SB_KEY = 'sb_publishable_uJmCKXdFbkU6-nSkYChkRQ_whLqPdE8';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+// ─── STATE ───
+let todosUsuarios = [];
+let clientes = [];
+let filtroRole = 'todos';
+let filtroStatus = 'todos'; // todos = ativos
+let usuarioSelecionado = null;
+
+// ─── INIT ───
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'ottus_login.html'; return; }
+
+  const { data: me } = await sb.from('users').select('name, role').eq('id', session.user.id).single();
+  if (me?.role !== 'admin') { window.location.href = 'ottus_login.html'; return; }
+
+  document.getElementById('userName').textContent = me?.name || session.user.email;
+  document.getElementById('userAvatar').textContent = (me?.name || 'A')[0].toUpperCase();
+
+  await Promise.all([carregarUsuarios(), carregarClientes()]);
+  document.getElementById('loadingScreen').classList.add('hidden');
+}
+
+// ─── CARREGAR USUÁRIOS ───
+async function carregarUsuarios() {
+  const { data: users, error } = await sb
+    .from('users')
+    .select('*')
+    .order('name');
+
+  if (error) { toast('Erro ao carregar usuários', 'error'); return; }
+
+  // buscar vínculos de cliente via client_users
+  const { data: cu } = await sb
+    .from('client_users')
+    .select('user_id, clients(id, company_name)');
+
+  const clienteMap = {};
+  (cu || []).forEach(r => {
+    if (r.clients) clienteMap[r.user_id] = r.clients;
+  });
+
+  todosUsuarios = (users || []).map(u => ({ ...u, cliente: clienteMap[u.id] || null }));
+  aplicarFiltros();
+}
+
+// ─── CARREGAR CLIENTES ───
+async function carregarClientes() {
+  const { data } = await sb.from('clients').select('id, company_name').eq('active', true).order('company_name');
+  clientes = data || [];
+
+  ['novoClienteId', 'editarClienteId'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">Selecione...</option>';
+    clientes.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.company_name;
+      sel.appendChild(o);
+    });
+  });
+}
+
+// ─── FILTROS ───
+function setFiltroRole(el) {
+  document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  filtroRole = el.dataset.filter;
+  aplicarFiltros();
+}
+
+function setFiltroStatus(el) {
+  document.querySelectorAll('[data-status]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  filtroStatus = el.dataset.status;
+  aplicarFiltros();
+}
+
+function aplicarFiltros() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+
+  let lista = todosUsuarios.filter(u => {
+    const matchRole = filtroRole === 'todos' || u.role === filtroRole;
+    const matchStatus = filtroStatus === 'all' ? true
+      : filtroStatus === 'inativos' ? !u.active
+      : u.active !== false; // ativos (default)
+    const matchSearch = !q
+      || (u.name || '').toLowerCase().includes(q)
+      || (u.email || '').toLowerCase().includes(q);
+    return matchRole && matchStatus && matchSearch;
+  });
+
+  document.getElementById('headerCount').textContent = `${lista.length} usuário${lista.length !== 1 ? 's' : ''}`;
+  renderLista(lista);
+}
+
+// ─── RENDER ───
+const roleMap = {
+  admin: { label: 'Admin', badge: 'badge-orange' },
+  pilot: { label: 'Piloto', badge: 'badge-blue' },
+  client_manager: { label: 'Ger. Cliente', badge: 'badge-green' },
+  client_site: { label: 'Cliente Obra', badge: 'badge-green' },
+};
+
+function avatarClass(role) {
+  if (role === 'admin') return 'avatar-admin';
+  if (role === 'pilot') return 'avatar-pilot';
+  if (role?.startsWith('client')) return 'avatar-client';
+  return 'avatar-default';
+}
+
+function renderLista(lista) {
+  const el = document.getElementById('listaUsuarios');
+  if (!lista.length) {
+    el.innerHTML = `<div class="table-empty"><div class="empty-icon">👤</div>Nenhum usuário encontrado</div>`;
+    return;
+  }
+
+  el.innerHTML = lista.map(u => {
+    const r = roleMap[u.role] || { label: u.role, badge: 'badge-gray' };
+    const ativo = u.active !== false;
+    const initials = (u.name || u.email || '?')[0].toUpperCase();
+    const sel = usuarioSelecionado?.id === u.id ? 'selected' : '';
+    return `
+      <div class="user-row-item ${sel}" onclick="selecionarUsuario('${u.id}')">
+        <div class="user-cell-name">
+          <div class="avatar-sm ${avatarClass(u.role)}">${initials}</div>
+          <div>
+            <div class="uname">${u.name || '—'}</div>
+            ${u.phone ? `<div class="uphone">${u.phone}</div>` : ''}
+          </div>
+        </div>
+        <div class="uemail">${u.email || '—'}</div>
+        <div><span class="badge ${r.badge}">${r.label}</span></div>
+        <div>
+          <span class="badge ${ativo ? 'badge-green' : 'badge-gray'}">
+            <span class="badge-dot"></span>${ativo ? 'Ativo' : 'Inativo'}
+          </span>
+        </div>
+        <div class="row-actions">
+          <button class="icon-btn" title="Editar" onclick="event.stopPropagation(); abrirEditar('${u.id}')">✏️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── SELECIONAR USUÁRIO ───
+function selecionarUsuario(id) {
+  const u = todosUsuarios.find(x => x.id === id);
+  if (!u) return;
+
+  if (usuarioSelecionado?.id === id) {
+    closePanel();
+    return;
+  }
+
+  usuarioSelecionado = u;
+  document.getElementById('mainWrap').classList.add('panel-open');
+  document.getElementById('sidePanel').classList.add('open');
+
+  const r = roleMap[u.role] || { label: u.role, badge: 'badge-gray' };
+  const ativo = u.active !== false;
+  const initials = (u.name || u.email || '?')[0].toUpperCase();
+  const clienteNome = u.cliente?.company_name || null;
+
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-avatar-wrap">
+      <div class="avatar-lg ${avatarClass(u.role)}">${initials}</div>
+      <div class="panel-user-name">${u.name || '—'}</div>
+      <div class="panel-user-email">${u.email || '—'}</div>
+      <span class="badge ${r.badge}" style="margin-top:4px">${r.label}</span>
+    </div>
+
+    <div class="info-block">
+      <div class="info-block-title">Informações</div>
+      <div class="info-row">
+        <span class="info-label">Status</span>
+        <span class="badge ${ativo ? 'badge-green' : 'badge-gray'}">
+          <span class="badge-dot"></span>${ativo ? 'Ativo' : 'Inativo'}
+        </span>
+      </div>
+      ${u.phone ? `
+      <div class="info-row">
+        <span class="info-label">Telefone</span>
+        <span class="info-value">${u.phone}</span>
+      </div>` : ''}
+      ${clienteNome ? `
+      <div class="info-row">
+        <span class="info-label">Cliente</span>
+        <span class="info-value">${clienteNome}</span>
+      </div>` : ''}
+      <div class="info-row">
+        <span class="info-label">Cadastrado em</span>
+        <span class="info-value">${u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '—'}</span>
+      </div>
+    </div>
+
+    <div class="info-block">
+      <div class="panel-section-title">Ações</div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem">
+        <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="abrirEditar('${u.id}')">✏️ Editar perfil</button>
+        <button class="btn ${ativo ? 'btn-danger' : 'btn-ghost'}" style="width:100%;justify-content:center" onclick="toggleAtivo('${u.id}', ${ativo})">
+          ${ativo ? '⊘ Desativar usuário' : '✓ Reativar usuário'}
+        </button>
+      </div>
+    </div>
+  `;
+
+  // highlight row
+  document.querySelectorAll('.user-row-item').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.user-row-item').forEach(r => {
+    if (r.onclick?.toString().includes(id)) r.classList.add('selected');
+  });
+}
+
+function closePanel() {
+  usuarioSelecionado = null;
+  document.getElementById('mainWrap').classList.remove('panel-open');
+  document.getElementById('sidePanel').classList.remove('open');
+  document.querySelectorAll('.user-row-item').forEach(r => r.classList.remove('selected'));
+}
+
+// ─── EDITAR USUÁRIO ───
+function abrirEditar(id) {
+  const u = todosUsuarios.find(x => x.id === id);
+  if (!u) return;
+
+  document.getElementById('editarId').value = u.id;
+  document.getElementById('editarNome').value = u.name || '';
+  document.getElementById('editarPhone').value = u.phone || '';
+  document.getElementById('editarRole').value = u.role || 'pilot';
+
+  // cliente vinculado
+  const sel = document.getElementById('editarClienteId');
+  sel.value = u.cliente?.id || '';
+  toggleEditarClienteSelect();
+  if (u.cliente?.id) sel.value = u.cliente.id;
+
+  openModal('modalEditarUsuario');
+}
+
+async function salvarEdicao() {
+  const id = document.getElementById('editarId').value;
+  const nome = document.getElementById('editarNome').value.trim();
+  const phone = document.getElementById('editarPhone').value.trim();
+  const role = document.getElementById('editarRole').value;
+  const clienteId = document.getElementById('editarClienteId').value || null;
+
+  if (!nome) { toast('Informe o nome', 'error'); return; }
+
+  const updates = { name: nome, phone: phone || null, role };
+  const { error } = await sb.from('users').update(updates).eq('id', id);
+  if (error) { toast('Erro ao salvar: ' + error.message, 'error'); return; }
+
+  // gerenciar vínculo em client_users
+  if (role === 'client_manager' || role === 'client_site') {
+    // remove vínculos anteriores e re-insere
+    await sb.from('client_users').delete().eq('user_id', id);
+    if (clienteId) {
+      await sb.from('client_users').insert({ user_id: id, client_id: clienteId });
+    }
+  } else {
+    // se mudou para admin/pilot, remove vínculos de cliente
+    await sb.from('client_users').delete().eq('user_id', id);
+  }
+
+  toast('Usuário atualizado!', 'success');
+  closeModal('modalEditarUsuario');
+  await carregarUsuarios();
+  if (usuarioSelecionado?.id === id) selecionarUsuario(id);
+}
+
+// ─── TOGGLE ATIVO ───
+async function toggleAtivo(id, atualAtivo) {
+  const { error } = await sb.from('users').update({ active: !atualAtivo }).eq('id', id);
+  if (error) { toast('Erro ao atualizar status', 'error'); return; }
+  toast(atualAtivo ? 'Usuário desativado' : 'Usuário reativado', 'success');
+  await carregarUsuarios();
+  closePanel();
+}
+
+// ─── REGISTRAR NOVO USUÁRIO ───
+async function registrarUsuario() {
+  const uuid = document.getElementById('novoUUID').value.trim();
+  const nome = document.getElementById('novoNome').value.trim();
+  const email = document.getElementById('novoEmail').value.trim();
+  const phone = document.getElementById('novoPhone').value.trim();
+  const role = document.getElementById('novoRole').value;
+  const clienteId = document.getElementById('novoClienteId').value || null;
+
+  if (!uuid) { toast('Informe o UUID do usuário', 'error'); return; }
+  if (!nome) { toast('Informe o nome', 'error'); return; }
+
+  const payload = { id: uuid, name: nome, email: email || null, phone: phone || null, role, active: true };
+
+  const { error } = await sb.from('users').upsert(payload, { onConflict: 'id' });
+  if (error) { toast('Erro ao registrar: ' + error.message, 'error'); return; }
+
+  // vínculo com cliente via client_users
+  if ((role === 'client_manager' || role === 'client_site') && clienteId) {
+    await sb.from('client_users').insert({ user_id: uuid, client_id: clienteId });
+  }
+
+  toast('Usuário registrado com sucesso!', 'success');
+  closeModal('modalNovoUsuario');
+  document.getElementById('novoUUID').value = '';
+  document.getElementById('novoNome').value = '';
+  document.getElementById('novoEmail').value = '';
+  document.getElementById('novoPhone').value = '';
+  await carregarUsuarios();
+}
+
+// ─── TOGGLE SELECT CLIENTE ───
+function toggleClienteSelect() {
+  const role = document.getElementById('novoRole').value;
+  const show = role === 'client_manager' || role === 'client_site';
+  document.getElementById('clienteSelectWrap').style.display = show ? '' : 'none';
+}
+function toggleEditarClienteSelect() {
+  const role = document.getElementById('editarRole').value;
+  const show = role === 'client_manager' || role === 'client_site';
+  document.getElementById('editarClienteWrap').style.display = show ? '' : 'none';
+}
+
+// ─── MODALS ───
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ─── TOAST ───
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.className = `toast toast-${type} show`;
+  el.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ─── SIDEBAR ───
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+// ─── LOGOUT ───
+async function logout() {
+  await sb.auth.signOut();
+  window.location.href = 'ottus_login.html';
+}
+
+init();
+</script>
+</body>
+</html>
