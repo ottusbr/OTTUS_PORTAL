@@ -1003,6 +1003,7 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
   reader.onload = (ev) => {
     pontosAtencao[currentPontoIndex].imageBase64 = ev.target.result;
     pontosAtencao[currentPontoIndex].imageFile = file;
+    pontosAtencao[currentPontoIndex].uploadStatus = 'pendente';
     renderPontos();
   };
   reader.readAsDataURL(file);
