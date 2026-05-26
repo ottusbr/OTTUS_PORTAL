@@ -203,6 +203,12 @@
   .attention-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .attention-photo-label { font-size: 12px; color: var(--text-tertiary); text-align: center; z-index: 1; }
   .attention-photo-icon { font-size: 24px; margin-bottom: 4px; }
+  .foto-status { position: absolute; top: 6px; right: 6px; border-radius: 20px; padding: 2px 8px; font-size: 10px; font-weight: 700; z-index: 2; display: flex; align-items: center; gap: 4px; }
+  .foto-status.ok { background: var(--green); color: white; }
+  .foto-status.erro { background: var(--red); color: white; }
+  .foto-status.pendente { background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.7); }
+  /* RASCUNHO BADGE */
+  .rascunho-badge { background: var(--orange-dim); border: 0.5px solid var(--orange-border); border-radius: var(--radius-sm); padding: 0.5rem 0.85rem; font-size: 11px; color: var(--orange); display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; }
   .attention-input { width: 100%; background: rgba(255,255,255,0.05); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.65rem 0.75rem; color: var(--text); font-size: 15px; outline: none; margin-bottom: 0.5rem; font-family: inherit; }
   .attention-input:focus { border-color: var(--orange); }
   .attention-input::placeholder { color: rgba(255,255,255,0.2); }
@@ -415,7 +421,11 @@
   <!-- ETAPA 1 — IDENTIFICAÇÃO -->
   <div class="step-content" id="step1">
     <div class="step-title">Identificação</div>
-    
+    <!-- Badge rascunho recuperado -->
+    <div class="rascunho-badge" id="rascunhoBadge" style="display:none">
+      💾 <span>Rascunho recuperado — seus dados foram restaurados automaticamente.</span>
+      <button onclick="descartarRascunho()" style="margin-left:auto;background:none;border:none;color:var(--orange);font-size:11px;cursor:pointer;font-weight:700;white-space:nowrap">Descartar</button>
+    </div>
 
     <div class="obra-info-card" id="obraInfoCard">
       <div class="obra-info-name" id="obraInfoName">—</div>
@@ -541,22 +551,7 @@
     </div>
 
     <!-- FILE INPUTS (hidden) -->
-    <input type="file" id="fileInputCamera" accept="image/*" capture="environment" style="display:none">
-    <input type="file" id="fileInputGallery" accept="image/*" style="display:none">
-
-    <!-- MENU CÂMERA / GALERIA -->
-    <div id="fotoMenu" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:800;align-items:flex-end;justify-content:center">
-      <div style="background:var(--navy-light);border-radius:16px 16px 0 0;border-top:0.5px solid var(--border);padding:1.25rem;width:100%;max-width:390px;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
-        <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-tertiary);text-align:center;margin-bottom:1rem">Adicionar foto</div>
-        <button onclick="usarCamera()" style="width:100%;background:var(--orange-dim);border:0.5px solid var(--orange-border);border-radius:var(--radius-sm);padding:1rem;color:var(--text);font-size:15px;font-weight:600;cursor:pointer;margin-bottom:0.65rem;display:flex;align-items:center;justify-content:center;gap:10px">
-          📷 Tirar foto agora
-        </button>
-        <button onclick="usarGaleria()" style="width:100%;background:rgba(255,255,255,0.05);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:1rem;color:var(--text);font-size:15px;font-weight:600;cursor:pointer;margin-bottom:0.65rem;display:flex;align-items:center;justify-content:center;gap:10px">
-          🖼 Escolher da galeria
-        </button>
-        <button onclick="fecharFotoMenu()" style="width:100%;background:none;border:none;padding:0.75rem;color:var(--text-tertiary);font-size:14px;cursor:pointer">Cancelar</button>
-      </div>
-    </div>
+    <input type="file" class="file-input" id="fileInput" accept="image/*" capture="environment"/>
   </div>
 
 
@@ -667,7 +662,7 @@
       </div>
     </div>
 
-    <button class="btn-sign" onclick="abrirConfirmacaoAssinatura()">
+    <button class="btn-sign" onclick="assinarRelatorio()">
       ✍ Assinar e enviar relatório
     </button>
     <button class="btn-back" onclick="voltarEtapa()" style="width:100%;margin-top:0.75rem;background:transparent;border:0.5px solid rgba(255,255,255,0.1);font-size:13px;color:rgba(255,255,255,0.35);letter-spacing:0.05em;font-family:'Syne',sans-serif">← Voltar</button>
@@ -876,6 +871,7 @@ function iniciarWizard() {
   document.getElementById('telaSelecao').style.display = 'none';
   document.getElementById('wizard').classList.add('active');
   irParaEtapa(1);
+  recuperarRascunho();
 }
 
 // ─── TIMESTAMPS ───
@@ -885,9 +881,9 @@ function registrarChegada() {
   const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   document.getElementById('tsChegada').textContent = hora;
   document.getElementById('tsChegada').classList.remove('empty');
-  
   document.getElementById('btnChegada').classList.add('done');
   calcularDuracao();
+  salvarRascunho();
   toast('Chegada registrada: ' + hora, 'success');
 }
 
@@ -899,12 +895,12 @@ function registrarSaida() {
   document.getElementById('tsSaida').textContent = hora;
   document.getElementById('tsSaida').classList.remove('empty');
   document.getElementById('btnSaida').classList.add('done');
-  // Atualizar label e ícone para estado concluído
   const iconEl = document.querySelector('#btnSaida .ts-icon');
   if (iconEl) { iconEl.textContent = '✈️'; iconEl.style.transform = 'scaleY(-1) rotate(45deg)'; }
   const labelEl = document.querySelector('#btnSaida .ts-label');
   if (labelEl) labelEl.textContent = 'Voo concluído';
   calcularDuracao();
+  salvarRascunho();
   toast('Voo concluído registrado: ' + hora, 'success');
 }
 
@@ -927,6 +923,7 @@ function selectClima(valor) {
   document.querySelectorAll('.clima-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('clima-' + valor).classList.add('selected');
   document.getElementById('rv-clima').textContent = climaLabels[valor] || valor;
+  salvarRascunho();
 }
 
 // ─── PROGRESSO ───
@@ -940,6 +937,7 @@ function updatePct(val) {
   }
   document.getElementById('pctDisplay').textContent = val;
   document.getElementById('rv-pct').textContent = val + '%';
+  salvarRascunho();
 }
 
 // ─── PONTOS DE ATENÇÃO ───
@@ -954,24 +952,36 @@ function adicionarPonto() {
 
 function renderPontos() {
   const el = document.getElementById('attentionList');
-  el.innerHTML = pontosAtencao.map((p, i) => `
+  el.innerHTML = pontosAtencao.map((p, i) => {
+    let fotoStatusHtml = '';
+    if (p.imageBase64) {
+      if (p.uploadStatus === 'ok') {
+        fotoStatusHtml = `<div class="foto-status ok">✓ Salva</div>`;
+      } else if (p.uploadStatus === 'erro') {
+        fotoStatusHtml = `<div class="foto-status erro">⚠ Falhou</div>`;
+      } else {
+        fotoStatusHtml = `<div class="foto-status pendente">📱 Local</div>`;
+      }
+    }
+    return `
     <div class="attention-item" id="ponto-${i}">
       <div class="attention-num">Ponto ${i + 1}</div>
       <button class="attention-remove" onclick="removerPonto(${i})">✕</button>
       <div class="attention-photo" onclick="tirarFoto(${i})">
-        ${p.imageBase64 ? `<img src="${p.imageBase64}" alt="foto"/>` : `
+        ${p.imageBase64 ? `<img src="${p.imageBase64}" alt="foto"/>${fotoStatusHtml}` : `
           <span class="attention-photo-icon">📷</span>
           <span class="attention-photo-label">Toque para fotografar<br><span style="font-size:10px;opacity:0.6">ou selecionar da galeria</span></span>
         `}
       </div>
-      <input class="attention-input" id="ponto-loc-${i}" placeholder="Localização — Ex: 3° andar, face norte" value="${p.location}" oninput="pontosAtencao[${i}].location = this.value"/>
-      <textarea class="attention-input" id="ponto-desc-${i}" placeholder="O que foi observado — descreva objetivamente o que a câmera capturou" style="min-height:70px;resize:none" oninput="pontosAtencao[${i}].description = this.value">${p.description}</textarea>
+      <input class="attention-input" id="ponto-loc-${i}" placeholder="Localização — Ex: 3° andar, face norte" value="${p.location}" oninput="pontosAtencao[${i}].location = this.value; salvarRascunho()"/>
+      <textarea class="attention-input" id="ponto-desc-${i}" placeholder="O que foi observado — descreva objetivamente o que a câmera capturou" style="min-height:70px;resize:none" oninput="pontosAtencao[${i}].description = this.value; salvarRascunho()">${p.description}</textarea>
       <div class="urgencia-row">
         <button class="urgencia-btn u-normal ${p.urgencia === 'normal' ? 'sel' : ''}" onclick="setUrgencia(${i},'normal')">● Normal</button>
         <button class="urgencia-btn u-atencao ${p.urgencia === 'atencao' ? 'sel' : ''}" onclick="setUrgencia(${i},'atencao')">⚠ Atenção</button>
         <button class="urgencia-btn u-critico ${p.urgencia === 'critico' ? 'sel' : ''}" onclick="setUrgencia(${i},'critico')">🔴 Crítico</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function removerPonto(i) {
@@ -981,47 +991,21 @@ function removerPonto(i) {
 
 function tirarFoto(index) {
   currentPontoIndex = index;
-  const menu = document.getElementById('fotoMenu');
-  menu.style.display = 'flex';
-}
-
-function fecharFotoMenu() {
-  document.getElementById('fotoMenu').style.display = 'none';
-  currentPontoIndex = null;
-}
-
-function usarCamera() {
-  document.getElementById('fotoMenu').style.display = 'none';
-  const input = document.getElementById('fileInputCamera');
+  const input = document.getElementById('fileInput');
   input.value = '';
   input.click();
 }
 
-function usarGaleria() {
-  document.getElementById('fotoMenu').style.display = 'none';
-  const input = document.getElementById('fileInputGallery');
-  input.value = '';
-  input.click();
-}
-
-function handleFotoFile(file) {
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
   if (!file || currentPontoIndex === null) return;
   const reader = new FileReader();
   reader.onload = (ev) => {
     pontosAtencao[currentPontoIndex].imageBase64 = ev.target.result;
     pontosAtencao[currentPontoIndex].imageFile = file;
     renderPontos();
-    currentPontoIndex = null;
   };
   reader.readAsDataURL(file);
-}
-
-document.getElementById('fileInputCamera').addEventListener('change', function(e) {
-  handleFotoFile(e.target.files[0]);
-});
-
-document.getElementById('fileInputGallery').addEventListener('change', function(e) {
-  handleFotoFile(e.target.files[0]);
 });
 
 // ─── NAVEGAÇÃO WIZARD ───
@@ -1112,54 +1096,96 @@ function preencherRevisao() {
 // ─── MONTAR NOTAS GERAIS ───
 function montarNotasGerais() {
   const obs = document.getElementById('generalNotes').value.trim();
-  if (!canteiroSelecionado) return obs || null;
-  const cantLabel = canteiroSelecionado === 'organizado' ? 'Organizado' : canteiroSelecionado === 'parcial' ? 'Parcialmente organizado' : 'Desorganizado';
-  return 'Canteiro: ' + cantLabel + (obs ? '. ' + obs : '');
+  const cantLabel = canteiroSelecionado === 'organizado' ? 'Organizado' : canteiroSelecionado === 'parcial' ? 'Parcialmente organizado' : canteiroSelecionado === 'desorganizado' ? 'Desorganizado' : null;
+
+  const chkLabels = { epi: 'EPI observado', placa: 'Placa visível', tapume: 'Tapume adequado', acesso: 'Acesso organizado', entulho: 'Entulho irregular' };
+  const marcados = Object.keys(checklistState).filter(k => checklistState[k]);
+  const checklistStr = marcados.length ? 'Checklist: ' + marcados.map(k => chkLabels[k]).join(', ') : null;
+
+  const partes = [];
+  if (cantLabel) partes.push('Canteiro: ' + cantLabel);
+  if (checklistStr) partes.push(checklistStr);
+  if (obs) partes.push(obs);
+  return partes.length ? partes.join('. ') : null;
 }
 
-// ─── MODAL CONFIRMAÇÃO ───
-function abrirConfirmacaoAssinatura() {
-  if (!visitaSelecionada) return;
-
-  const pct = parseInt(document.getElementById('pctSlider').value) || 0;
-  const obra = visitaSelecionada.sites?.name || '—';
-  const chegada = horarioChegada ? horarioChegada.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : 'Não registrado';
-  const saida = horarioSaida ? horarioSaida.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : 'Não registrado';
-  const pontos = pontosAtencao.filter(p => p.description).length;
-  const clima = climaLabels[climaSelecionado] || 'Não informado';
-
-  document.getElementById('confirmResumo').innerHTML =
-    `<strong style="color:var(--text)">${obra}</strong><br>` +
-    `Chegada: <strong style="color:var(--text)">${chegada}</strong> &nbsp;|&nbsp; Saída: <strong style="color:var(--text)">${saida}</strong><br>` +
-    `Progresso: <strong style="color:var(--orange)">${pct}%</strong> &nbsp;|&nbsp; Clima: <strong style="color:var(--text)">${clima}</strong><br>` +
-    `Pontos de atenção: <strong style="color:var(--text)">${pontos > 0 ? pontos + ' ponto(s)' : 'Nenhum'}</strong>`;
-
-  // Aviso se voo não encerrado
-  const avisoVoo = document.getElementById('confirmAvisoVoo');
-  if (!horarioSaida) {
-    avisoVoo.style.display = 'flex';
-  } else {
-    avisoVoo.style.display = 'none';
-  }
-
-  document.getElementById('modalConfirmacao').style.display = 'flex';
+// ─── RASCUNHO (localStorage) ───
+function chaveRascunho() {
+  return visitaSelecionada ? `ottus_draft_${visitaSelecionada.id}` : null;
 }
 
-function fecharConfirmacao() {
-  document.getElementById('modalConfirmacao').style.display = 'none';
+function salvarRascunho() {
+  const chave = chaveRascunho();
+  if (!chave) return;
+  try {
+    const draft = {
+      step: currentStep,
+      clima: climaSelecionado,
+      canteiro: canteiroSelecionado,
+      chegada: horarioChegada ? horarioChegada.toISOString() : null,
+      saida: horarioSaida ? horarioSaida.toISOString() : null,
+      checklist: checklistState,
+      pct: document.getElementById('pctSlider')?.value || 0,
+      progressNotes: document.getElementById('progressNotes')?.value || '',
+      generalNotes: document.getElementById('generalNotes')?.value || '',
+      siteContact: document.getElementById('siteContact')?.value || '',
+      pontos: pontosAtencao.map(p => ({
+        location: p.location,
+        description: p.description,
+        urgencia: p.urgencia,
+        imageBase64: p.imageBase64 || null,
+        uploadStatus: p.uploadStatus || null,
+      })),
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(chave, JSON.stringify(draft));
+  } catch(e) { /* quota exceeded */ }
+}
+
+function recuperarRascunho() {
+  const chave = chaveRascunho();
+  if (!chave) return false;
+  try {
+    const raw = localStorage.getItem(chave);
+    if (!raw) return false;
+    const draft = JSON.parse(raw);
+    if (Date.now() - draft.savedAt > 48 * 60 * 60 * 1000) { localStorage.removeItem(chave); return false; }
+
+    if (draft.clima) { climaSelecionado = draft.clima; document.getElementById('clima-' + draft.clima)?.classList.add('selected'); document.getElementById('rv-clima').textContent = climaLabels[draft.clima] || draft.clima; }
+    if (draft.canteiro) selectCanteiro(draft.canteiro);
+    if (draft.chegada) { horarioChegada = new Date(draft.chegada); const hora = horarioChegada.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); document.getElementById('tsChegada').textContent = hora; document.getElementById('tsChegada').classList.remove('empty'); document.getElementById('btnChegada').classList.add('done'); }
+    if (draft.saida) { horarioSaida = new Date(draft.saida); const hora = horarioSaida.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); document.getElementById('tsSaida').textContent = hora; document.getElementById('tsSaida').classList.remove('empty'); document.getElementById('btnSaida').classList.add('done'); calcularDuracao(); }
+    if (draft.checklist) { checklistState = draft.checklist; Object.keys(checklistState).forEach(k => { if (checklistState[k]) { const item = document.getElementById('chk-' + k); const icon = document.getElementById('chk-icon-' + k); if (item) { item.classList.add('checked'); if (item.dataset.negative === 'true') item.classList.add('negative'); } if (icon) icon.textContent = '✓'; } }); }
+    if (draft.pct) { document.getElementById('pctSlider').value = draft.pct; document.getElementById('pctDisplay').textContent = draft.pct; document.getElementById('rv-pct').textContent = draft.pct + '%'; }
+    if (draft.progressNotes) document.getElementById('progressNotes').value = draft.progressNotes;
+    if (draft.generalNotes) document.getElementById('generalNotes').value = draft.generalNotes;
+    if (draft.siteContact) document.getElementById('siteContact').value = draft.siteContact;
+    if (draft.pontos?.length) { pontosAtencao = draft.pontos.map(p => ({ ...p, imageFile: null })); renderPontos(); }
+
+    document.getElementById('rascunhoBadge').style.display = 'flex';
+    return true;
+  } catch(e) { return false; }
+}
+
+function descartarRascunho() {
+  const chave = chaveRascunho();
+  if (chave) localStorage.removeItem(chave);
+  document.getElementById('rascunhoBadge').style.display = 'none';
+  toast('Rascunho descartado', 'success');
+}
+
+function limparRascunho() {
+  const chave = chaveRascunho();
+  if (chave) localStorage.removeItem(chave);
 }
 
 // ─── ASSINAR E SALVAR ───
 async function assinarRelatorio() {
   if (!visitaSelecionada) return;
 
-  // Fecha modal de confirmação se aberto
-  document.getElementById('modalConfirmacao').style.display = 'none';
-
-  const btn = document.getElementById('btnConfirmarAssinatura');
-  const btnSign = document.querySelector('.btn-sign');
-  if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
-  if (btnSign) { btnSign.disabled = true; btnSign.textContent = 'Salvando...'; }
+  const btn = document.querySelector('.btn-sign');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
 
   try {
     const startTime = horarioChegada ? horarioChegada.toTimeString().substring(0,5) : null;
@@ -1205,9 +1231,11 @@ async function assinarRelatorio() {
           .upload(fileName, p.imageFile, { contentType: p.imageFile.type || 'image/jpeg', upsert: true });
         if (uploadError) {
           console.warn('Erro upload foto ponto ' + (i+1) + ':', uploadError.message);
+          p.uploadStatus = 'erro';
         } else if (uploadData) {
           const { data: urlData } = sb.storage.from('visit-media').getPublicUrl(fileName);
           imageUrl = (urlData && urlData.publicUrl) || null;
+          p.uploadStatus = 'ok';
         }
       }
 
@@ -1226,15 +1254,14 @@ async function assinarRelatorio() {
     await sb.from('sites').update({ next_visit_date: null }).eq('id', visitaSelecionada.site_id);
 
     preencherPosAssinatura();
+    limparRascunho();
     document.getElementById('uploadScreen').classList.add('show');
 
   } catch (err) {
     console.error('assinarRelatorio:', err);
     toast('Erro: ' + (err.message || 'Tente novamente'), 'error');
-    const btn = document.getElementById('btnConfirmarAssinatura');
-    const btnSign = document.querySelector('.btn-sign');
-    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirmar e assinar'; }
-    if (btnSign) { btnSign.disabled = false; btnSign.textContent = '✍ Assinar e enviar relatório'; }
+    btn.disabled = false;
+    btn.textContent = '\u270d Assinar e enviar relatório';
   }
 }
 
@@ -1296,7 +1323,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ─── CANTEIRO ───
 function selectCanteiro(valor) {
   canteiroSelecionado = valor;
   const cores = { organizado: 'selected-green', parcial: 'selected-yellow', desorganizado: 'selected-red' };
@@ -1304,12 +1330,14 @@ function selectCanteiro(valor) {
     const btn = document.getElementById('canteiro-' + v);
     btn.className = 'canteiro-btn' + (v === valor ? ' ' + cores[v] : '');
   });
+  salvarRascunho();
 }
 
 // ─── URGÊNCIA ───
 function setUrgencia(index, valor) {
   pontosAtencao[index].urgencia = valor;
   renderPontos();
+  salvarRascunho();
 }
 
 // ─── CHECKLIST ───
@@ -1326,6 +1354,7 @@ function toggleCheck(key) {
     item.classList.remove('checked', 'negative');
     icon.textContent = '';
   }
+  salvarRascunho();
 }
 
 // ─── VER VISITA CONCLUÍDA (somente leitura) ───
@@ -1526,39 +1555,6 @@ init();
 
     <button class="btn-voltar" style="width:100%" onclick="voltarInicio()">Voltar ao início</button>
     <div style="height:2rem"></div>
-  </div>
-</div>
-
-<!-- MODAL CONFIRMAÇÃO ASSINATURA -->
-<div id="modalConfirmacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:900;align-items:center;justify-content:center;padding:1.25rem">
-  <div style="background:var(--navy-light);border:0.5px solid var(--border);border-radius:var(--radius);width:100%;max-width:360px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6)">
-    <!-- Header -->
-    <div style="background:rgba(34,197,94,0.08);border-bottom:0.5px solid rgba(34,197,94,0.2);padding:1.1rem 1.25rem;display:flex;align-items:center;gap:10px">
-      <span style="font-size:22px">✍</span>
-      <div>
-        <div style="font-size:15px;font-weight:700">Confirmar assinatura</div>
-        <div style="font-size:11px;color:var(--text-secondary);margin-top:1px">Revise antes de enviar — não poderá editar depois</div>
-      </div>
-    </div>
-    <!-- Resumo -->
-    <div style="padding:1rem 1.25rem">
-      <div id="confirmResumo" style="background:rgba(255,255,255,0.03);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:0.85rem 1rem;margin-bottom:1rem;font-size:13px;line-height:1.8;color:var(--text-secondary)"></div>
-      <!-- Aviso sem voo concluído -->
-      <div id="confirmAvisoVoo" style="display:none;background:var(--red-dim);border:0.5px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);padding:0.75rem 1rem;margin-bottom:1rem;font-size:12px;color:var(--red);display:flex;align-items:center;gap:8px">
-        ⚠ <span>Voo não encerrado — o horário de saída não foi registrado.</span>
-      </div>
-      <!-- Disclaimer -->
-      <div style="font-size:11px;color:var(--text-tertiary);line-height:1.6;margin-bottom:1.25rem">
-        Ao assinar, você confirma que as informações acima são verdadeiras e que o relatório pode ser enviado para revisão da OTTUS.
-      </div>
-      <!-- Botões -->
-      <button onclick="assinarRelatorio()" id="btnConfirmarAssinatura" style="width:100%;background:linear-gradient(135deg,#1a9e4a 0%,#16a34a 100%);border:none;border-radius:var(--radius-sm);padding:1rem;color:white;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:0.65rem;letter-spacing:0.02em;box-shadow:0 4px 20px rgba(34,197,94,0.3)">
-        ✅ Confirmar e assinar
-      </button>
-      <button onclick="fecharConfirmacao()" style="width:100%;background:none;border:0.5px solid rgba(255,255,255,0.1);border-radius:var(--radius-sm);padding:0.85rem;color:rgba(255,255,255,0.4);font-size:14px;cursor:pointer">
-        ← Voltar e revisar
-      </button>
-    </div>
   </div>
 </div>
 
