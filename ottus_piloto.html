@@ -1184,6 +1184,13 @@ function limparRascunho() {
 async function assinarRelatorio() {
   if (!visitaSelecionada) return;
 
+  // Aviso se há pontos sem foto
+  const pontosSemFoto = pontosAtencao.filter(p => p.description && p.description.trim() && !p.imageBase64);
+  if (pontosSemFoto.length > 0) {
+    const ok = confirm(`${pontosSemFoto.length} ponto(s) de atenção sem foto. Deseja assinar assim mesmo?`);
+    if (!ok) return;
+  }
+
   const btn = document.querySelector('.btn-sign');
   if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
 
