@@ -1225,6 +1225,7 @@ async function assinarRelatorio() {
       let imageUrl = null;
 
       if (p.imageFile) {
+        if (btn) btn.textContent = `Enviando foto ${i+1} de ${pontosValidos.length}...`;
         const ext = (p.imageFile.name && p.imageFile.name.split('.').pop()) || 'jpg';
         const fileName = visitaSelecionada.id + '/ponto-' + (i+1) + '-' + Date.now() + '.' + ext;
         const { data: uploadData, error: uploadError } = await sb.storage
