@@ -1185,8 +1185,7 @@ async function assinarRelatorio() {
   if (!visitaSelecionada) return;
 
   const btn = document.querySelector('.btn-sign');
-  btn.disabled = true;
-  btn.textContent = 'Salvando...';
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
 
   try {
     const startTime = horarioChegada ? horarioChegada.toTimeString().substring(0,5) : null;
@@ -1262,8 +1261,8 @@ async function assinarRelatorio() {
   } catch (err) {
     console.error('assinarRelatorio:', err);
     toast('Erro: ' + (err.message || 'Tente novamente'), 'error');
-    btn.disabled = false;
-    btn.textContent = '\u270d Assinar e enviar relatório';
+    const btnRestore = document.querySelector('.btn-sign');
+    if (btnRestore) { btnRestore.disabled = false; btnRestore.textContent = '✍ Assinar e enviar relatório'; }
   }
 }
 
